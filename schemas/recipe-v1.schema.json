@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/tyutyutyu/zenget/main/schemas/recipe-v1.schema.json",
+  "title": "zenget install recipe schema version 1",
+  "description": "Versioned install recipe consumed by zenget install. The authoritative contract is the strict decoder in internal/recipe; this schema mirrors it for editors and registry CI. Regular-expression fields use RE2 syntax on the Go side; JSON Schema validates them as ECMA-262 regular expressions, which is a broader dialect.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "const": "https://raw.githubusercontent.com/tyutyutyu/zenget/main/schemas/recipe-v1.schema.json"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "repository": {
+      "$ref": "#/$defs/repository"
+    },
+    "supported_systems": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/platform"
+      },
+      "uniqueItems": true,
+      "minItems": 1
+    },
+    "asset_selector": {
+      "$ref": "#/$defs/asset_selector"
+    },
+    "archive_binary": {
+      "$ref": "#/$defs/archive_binary"
+    },
+    "target_name": {
+      "$ref": "#/$defs/target_name"
+    },
+    "checksum": {
+      "$ref": "#/$defs/checksum"
+    }
+  },
+  "required": [
+    "schema_version",
+    "repository"
+  ],
+  "$defs": {
+    "repository": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+    },
+    "platform": {
+      "type": "string",
+      "enum": [
+        "linux/386",
+        "linux/amd64",
+        "linux/arm",
+        "linux/arm64",
+        "darwin/amd64",
+        "darwin/arm64",
+        "windows/386",
+        "windows/amd64",
+        "windows/arm",
+        "windows/arm64"
+      ]
+    },
+    "asset_selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "type": {
+          "enum": [
+            "substring",
+            "regex"
+          ]
+        },
+        "pattern": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "version",
+        "type",
+        "pattern"
+      ]
+    },
+    "archive_binary": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "anyOf": [
+          {
+            "pattern": "^/"
+          },
+          {
+            "pattern": "^\\.$|^\\.\\.$"
+          },
+          {
+            "pattern": "(^|/)\\.\\.(/|$)"
+          },
+          {
+            "pattern": "\\\\"
+          },
+          {
+            "pattern": "\\u0000"
+          }
+        ]
+      }
+    },
+    "target_name": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "anyOf": [
+          {
+            "pattern": "^\\.$|^\\.\\.$"
+          },
+          {
+            "pattern": "[/\\\\]"
+          },
+          {
+            "pattern": "\\u0000"
+          }
+        ]
+      }
+    },
+    "checksum": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "exact",
+            "regex"
+          ]
+        },
+        "pattern": {
+          "type": "string",
+          "minLength": 1
+        },
+        "format": {
+          "enum": [
+            "raw",
+            "sha256sum"
+          ]
+        }
+      },
+      "required": [
+        "type",
+        "pattern",
+        "format"
+      ]
+    }
+  }
+}

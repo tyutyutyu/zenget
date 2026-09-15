@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/tyutyutyu/zenget/main/schemas/manifest-v1.schema.json",
+  "title": "zenget portable manifest schema version 1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "const": "https://raw.githubusercontent.com/tyutyutyu/zenget/main/schemas/manifest-v1.schema.json"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "apps": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/app"
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "apps"
+  ],
+  "$defs": {
+    "repository": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+    },
+    "tag": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^\\u0000\\r\\n ~^:?*\\[\\\\]+$",
+      "not": {
+        "anyOf": [
+          {
+            "pattern": "\\.\\."
+          },
+          {
+            "pattern": "\\.$"
+          },
+          {
+            "pattern": "/$"
+          }
+        ]
+      }
+    },
+    "asset": {
+      "type": "string",
+      "pattern": "^[^\\u0000]*$",
+      "not": {
+        "pattern": "://"
+      }
+    },
+    "archive_binary": {
+      "type": "string",
+      "pattern": "^(?!/).*$",
+      "not": {
+        "anyOf": [
+          {
+            "pattern": "\\\\"
+          },
+          {
+            "pattern": "\\u0000"
+          },
+          {
+            "pattern": "(^|/)\\.\\.(?:/|$)"
+          }
+        ]
+      }
+    },
+    "target_name": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^/\\\\\\u0000]+$",
+      "not": {
+        "enum": [
+          ".",
+          ".."
+        ]
+      }
+    },
+    "app": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repository": {
+          "$ref": "#/$defs/repository"
+        },
+        "provider": {
+          "enum": [
+            "github"
+          ]
+        },
+        "tag": {
+          "$ref": "#/$defs/tag"
+        },
+        "asset": {
+          "$ref": "#/$defs/asset"
+        },
+        "platform_os": {
+          "enum": [
+            "linux",
+            "darwin",
+            "windows"
+          ]
+        },
+        "platform_arch": {
+          "enum": [
+            "amd64",
+            "arm64",
+            "386",
+            "arm"
+          ]
+        },
+        "archive_binary": {
+          "$ref": "#/$defs/archive_binary"
+        },
+        "target_name": {
+          "$ref": "#/$defs/target_name"
+        }
+      },
+      "required": [
+        "repository",
+        "provider",
+        "tag"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "platform_os"
+            ]
+          },
+          "then": {
+            "required": [
+              "platform_arch"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "platform_arch"
+            ]
+          },
+          "then": {
+            "required": [
+              "platform_os"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

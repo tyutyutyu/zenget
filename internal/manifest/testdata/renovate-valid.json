@@ -1,0 +1,22 @@
+{
+  "schema_version" : 1,
+  "$schema" : "https://raw.githubusercontent.com/tyutyutyu/zenget/main/schemas/manifest-v1.schema.json",
+  "apps" : [
+    {
+      "repository" : "acme/widget" ,
+      "provider" : "github" ,
+      "tag" : "v1.2.3" ,
+      "asset" : "widget-linux-amd64.tar.gz" ,
+      "platform_os" : "linux" ,
+      "platform_arch" : "amd64" ,
+      "archive_binary" : "bin/widget" ,
+      "target_name" : "widget"
+    },
+
+    {
+      "repository": "zeta/tool",
+      "provider": "github",
+      "tag": "release-2025.09"
+    }
+  ]
+}

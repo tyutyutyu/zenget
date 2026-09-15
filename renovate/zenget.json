@@ -1,0 +1,14 @@
+{
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update exact GitHub release tags in canonical zenget manifests",
+      "managerFilePatterns": ["/(^|\\/)zenget\\.json$/"],
+      "matchStrings": [
+        "\\\"repository\\\"\\s*:\\s*\\\"(?<depName>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)\\\"\\s*,\\s*\\\"provider\\\"\\s*:\\s*\\\"github\\\"\\s*,\\s*\\\"tag\\\"\\s*:\\s*\\\"(?<currentValue>[^\\\"\\\\\\r\\n]+)\\\""
+      ],
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "loose"
+    }
+  ]
+}
