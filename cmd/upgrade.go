@@ -342,10 +342,6 @@ func buildUpgradePlan(ctx context.Context, client *github.Client, st *state.Stat
 	return plan
 }
 
-func lookupUpgradeReleases(ctx context.Context, client *github.Client, repositories []string) map[string]upgradeLookup {
-	return lookupUpgradeReleasesWithFilters(ctx, client, repositories, nil)
-}
-
 func lookupUpgradeReleasesWithState(ctx context.Context, client *github.Client, repositories []string, st *state.State) map[string]upgradeLookup {
 	filters := make(map[string]string, len(repositories))
 	for _, repository := range repositories {

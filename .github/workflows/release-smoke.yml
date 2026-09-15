@@ -1,0 +1,111 @@
+name: Public release smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Published release tag to verify (for example v1.2.3)
+        required: true
+        type: string
+      previous_tag:
+        description: Older published tag for Linux/macOS self-upgrade (optional for the first release)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify-assets:
+    name: Verify public checksums and all archives
+    runs-on: ubuntu-24.04
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+      GITHUB_REPOSITORY: ${{ github.repository }}
+    steps:
+      - name: Check out smoke scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+
+      - name: Download every public release asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}"
+          mkdir -p dist
+          curl --fail --location --retry 3 "$base/checksums.txt" --output dist/checksums.txt
+          while IFS= read -r asset; do
+            case "$asset" in
+              zenget_*.tar.gz|zenget_*.zip) ;;
+              *) echo "Unexpected release asset in checksums.txt: $asset" >&2; exit 1 ;;
+            esac
+            curl --fail --location --retry 3 "$base/$asset" --output "dist/$asset"
+          done < <(awk 'NF == 2 { gsub(/^\*/, "", $2); print $2 }' dist/checksums.txt)
+
+      - name: Verify checksums, archive contents, and Linux help
+        run: scripts/verify-release-artifacts.sh dist --run-help
+
+  unix-smoke:
+    name: ${{ matrix.os }} checksum and self-upgrade smoke
+    needs: verify-assets
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            archive_os: linux
+            archive_arch: amd64
+          - os: macos-14
+            archive_os: darwin
+            archive_arch: arm64
+    runs-on: ${{ matrix.os }}
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+      PREVIOUS_TAG: ${{ inputs.previous_tag }}
+      GITHUB_REPOSITORY: ${{ github.repository }}
+    steps:
+      - name: Check out smoke scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+
+      - name: Run platform smoke
+        shell: bash
+        run: scripts/release-platform-smoke.sh "$RELEASE_TAG" "$PREVIOUS_TAG" "${{ matrix.archive_os }}" "${{ matrix.archive_arch }}"
+
+  windows-smoke:
+    name: Windows archive and help smoke
+    needs: verify-assets
+    runs-on: windows-latest
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+      GITHUB_REPOSITORY: ${{ github.repository }}
+    steps:
+      - name: Download and exercise Windows archive
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $version = $env:RELEASE_TAG -replace '^[vV]', ''
+          $archive = "zenget_${version}_windows_amd64.zip"
+          $base = "https://github.com/$($env:GITHUB_REPOSITORY)/releases/download/$($env:RELEASE_TAG)"
+          $work = Join-Path $env:RUNNER_TEMP "zenget-release-smoke"
+          New-Item -ItemType Directory -Force -Path $work | Out-Null
+          Invoke-WebRequest -Uri "$base/checksums.txt" -OutFile "$work/checksums.txt"
+          Invoke-WebRequest -Uri "$base/$archive" -OutFile "$work/$archive"
+
+          $checksumLine = Get-Content "$work/checksums.txt" |
+            Where-Object { $_ -match "\s$([regex]::Escape($archive))$" } |
+            Select-Object -First 1
+          if (-not $checksumLine) { throw "checksums.txt does not contain $archive" }
+          $expected = ($checksumLine -split "\s+")[0].ToLowerInvariant()
+          $actual = (Get-FileHash "$work/$archive" -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($expected -ne $actual) { throw "SHA-256 mismatch for $archive" }
+
+          $extract = Join-Path $work "extracted"
+          Expand-Archive -LiteralPath "$work/$archive" -DestinationPath $extract -Force
+          $binary = Join-Path $extract "zenget.exe"
+          if (-not (Test-Path -LiteralPath $binary)) { throw "archive does not contain zenget.exe at its root" }
+          & $binary --help | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "zenget.exe --help failed with exit code $LASTEXITCODE" }
+          Write-Host "Windows archive, checksum, extraction, and --help smoke passed."

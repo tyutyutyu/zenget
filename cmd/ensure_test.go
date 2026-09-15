@@ -27,13 +27,13 @@ func TestRestoreReusesArtifactCacheForMissingBinary(t *testing.T) {
 	latestTag.Store("v1.0.0")
 	var exactRequests, assetRequests atomic.Int32
 	server := newEnsureTestServer(t, func(r *http.Request) (string, int) {
-		switch {
-		case r.URL.Path == "/repos/acme/widget/releases/latest":
+		switch r.URL.Path {
+		case "/repos/acme/widget/releases/latest":
 			return latestTag.Load().(string), http.StatusOK
-		case r.URL.Path == "/repos/acme/widget/releases/tags/v1.0.0":
+		case "/repos/acme/widget/releases/tags/v1.0.0":
 			exactRequests.Add(1)
 			return "v1.0.0", http.StatusOK
-		case r.URL.Path == "/assets/widget":
+		case "/assets/widget":
 			assetRequests.Add(1)
 			return "version one", http.StatusOK
 		default:

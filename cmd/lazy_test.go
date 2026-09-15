@@ -238,7 +238,7 @@ func TestLazyInstallRejectsInvalidProjectState(t *testing.T) {
 		if err := os.Remove(manifestPath); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := lazyInstallProjectTarget(nil, selection); err == nil || !strings.Contains(err.Error(), "reload project manifest") {
+		if _, err := lazyInstallProjectTarget(nil, selection); err == nil || !strings.Contains(err.Error(), "reload project manifest") { //nolint:staticcheck // this test covers nil-context normalization
 			t.Fatalf("reload error = %v", err)
 		}
 	})

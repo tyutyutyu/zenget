@@ -1109,10 +1109,6 @@ func resolveInstallAssetWithSelectors(rel *github.Release, goos, goarch, explici
 	return asset, asset.Name, true, nil
 }
 
-func resolveArchiveBinary(assetPath string, format install.Format, defaultName, explicit, saved string, interactive bool, prompter *wizard.Session) (string, bool, error) {
-	return resolveArchiveBinaryWithRecipe(assetPath, format, defaultName, explicit, saved, "", interactive, prompter)
-}
-
 func resolveArchiveBinaryWithRecipe(assetPath string, format install.Format, defaultName, explicit, saved, recipeBinary string, interactive bool, prompter *wizard.Session) (string, bool, error) {
 	executables, err := install.ListExecutables(assetPath, format)
 	if err != nil {
@@ -1185,10 +1181,6 @@ func pathBase(name string) string {
 		return name[index+1:]
 	}
 	return name
-}
-
-func resolveTargetName(repo, explicit, saved string, promptNeeded, interactive bool, prompter *wizard.Session) (string, bool, error) {
-	return resolveTargetNameWithRecipe(repo, explicit, saved, "", promptNeeded, interactive, prompter)
 }
 
 func resolveTargetNameWithRecipe(repo, explicit, saved, recipeTarget string, promptNeeded, interactive bool, prompter *wizard.Session) (string, bool, error) {
@@ -1348,11 +1340,6 @@ func rollbackFreshInstall(wrapperPath, realPath string) error {
 		}
 	}
 	return firstErr
-}
-
-// resolveRelease returns the release to install without release filtering.
-func resolveRelease(ctx context.Context, client provider.Provider, org, repo, tag string) (*github.Release, error) {
-	return resolveReleaseWithFilter(ctx, client, org, repo, tag, "")
 }
 
 // resolveReleaseWithFilter returns the release to install. An empty filter
@@ -1538,13 +1525,6 @@ func releaseResolutionError(repository string, options installOptions, err error
 		return fmt.Errorf("fetch latest release for %s: %w", repository, err)
 	}
 	return fmt.Errorf("fetch release for %s: %w", repository, err)
-}
-
-// resolveReleaseWithMinAge selects the newest published stable release that
-// is at least minAgeDays old. The second return value reports whether a newer
-// stable release was skipped because it was too young.
-func resolveReleaseWithMinAge(ctx context.Context, client provider.Provider, org, repo string, minAgeDays int) (*github.Release, bool, error) {
-	return resolveReleaseWithMinAgeFilter(ctx, client, org, repo, minAgeDays, "")
 }
 
 func resolveReleaseWithMinAgeFilter(ctx context.Context, client provider.Provider, org, repo string, minAgeDays int, releaseFilter string) (*github.Release, bool, error) {

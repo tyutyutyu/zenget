@@ -14,8 +14,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"syscall"
 
+	"zenget/internal/fileowner"
 	"zenget/internal/limits"
 )
 
@@ -413,7 +413,7 @@ func Load() (Policy, error) {
 	if err != nil {
 		return Policy{}, fmt.Errorf("open recipe policy %q: %w", policyPath, err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	data, err := limits.ReadAll(file, limits.DefaultStructuredBytes, "recipe policy", policyPath)
 	if err != nil {
 		return Policy{}, fmt.Errorf("read recipe policy %q: %w", policyPath, err)
@@ -551,8 +551,7 @@ func validatePolicyFile(policyPath string, info os.FileInfo) error {
 	if info.Mode().Perm()&0077 != 0 || info.Mode()&(os.ModeSetuid|os.ModeSetgid|os.ModeSticky) != 0 {
 		return fmt.Errorf("recipe policy %q permissions must be no more permissive than 0600", policyPath)
 	}
-	stat, ok := info.Sys().(*syscall.Stat_t)
-	if !ok || uint32(os.Geteuid()) != stat.Uid {
+	if !fileowner.CurrentUserOwns(info) {
 		return fmt.Errorf("recipe policy %q is not owned by the current user", policyPath)
 	}
 	return nil

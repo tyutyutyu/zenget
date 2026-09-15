@@ -20,8 +20,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"syscall"
 
+	"zenget/internal/fileowner"
 	"zenget/internal/limits"
 	"zenget/internal/recipe"
 	"zenget/internal/recipepolicy"
@@ -758,8 +758,6 @@ type snapshotPointer struct {
 	IndexSHA256   string `json:"index_sha256"`
 }
 
-type snapshotMetadata = snapshotPointer
-
 func writeSnapshotFiles(directory string, source Source, indexData []byte, indexDigest string, index Index, recipes map[string][]byte) error {
 	metadata := snapshotPointer{SchemaVersion: SchemaVersion, Source: source.String(), IndexSHA256: indexDigest}
 	metadataData, err := marshalPointer(metadata)
@@ -1119,8 +1117,7 @@ func validatePrivateFile(info os.FileInfo, kind string) error {
 	if info.Mode().Perm()&0077 != 0 || info.Mode()&(os.ModeSetuid|os.ModeSetgid|os.ModeSticky) != 0 {
 		return fmt.Errorf("%s permissions must be no more permissive than 0600", kind)
 	}
-	stat, ok := info.Sys().(*syscall.Stat_t)
-	if !ok || uint32(os.Geteuid()) != stat.Uid {
+	if !fileowner.CurrentUserOwns(info) {
 		return fmt.Errorf("%s is not owned by the current user", kind)
 	}
 	return nil

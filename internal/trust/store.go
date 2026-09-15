@@ -11,8 +11,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"syscall"
 
+	"zenget/internal/fileowner"
 	"zenget/internal/limits"
 )
 
@@ -412,12 +412,8 @@ func validateOwnerAndMode(info os.FileInfo, path, label string) error {
 	if info.Mode().Perm()&unsafeWriteMask != 0 {
 		return fmt.Errorf("%s %q is group/world writable", label, path)
 	}
-	stat, ok := info.Sys().(*syscall.Stat_t)
-	if !ok {
+	if !fileowner.CurrentUserOwns(info) {
 		return fmt.Errorf("inspect %s %q: ownership is unavailable", label, path)
-	}
-	if uint64(stat.Uid) != uint64(os.Geteuid()) {
-		return fmt.Errorf("%s %q is not owned by the current user", label, path)
 	}
 	return nil
 }
