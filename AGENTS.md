@@ -4,7 +4,7 @@
 
 ## Working here
 
-Run `backlog instructions overview` from `../zenget-backlog/` for every workspace request, then follow the matching Backlog task guide when the request involves task lifecycle work. Use the Backlog CLI to change task metadata and content. Keep `.backlog/` out of this public repository.
+When working in `zenget-workspace`, run `backlog instructions overview` from `../zenget-backlog/` for every request, then follow the matching Backlog task guide when the request involves task lifecycle work. Use the Backlog CLI to change task metadata and content. A standalone clone can be built and tested without the sibling planning repository. Keep `.backlog/` out of this public repository.
 
 Use Go modules. Source is in `main.go`, `cmd/`, and `internal/`; tests are adjacent `*_test.go` files. `docs/`, `schemas/`, `renovate/`, `scripts/`, and `tools/attestation-harness/` provide documentation, schemas, automation, and an offline attestation spike. User-facing behavior is documented in `README.md`.
 
