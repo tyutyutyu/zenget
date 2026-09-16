@@ -437,6 +437,9 @@ func Save(p Policy) error {
 	if err := os.MkdirAll(directory, 0700); err != nil {
 		return fmt.Errorf("create recipe policy directory %q: %w", directory, err)
 	}
+	if err := fileowner.SecurePath(directory, true); err != nil {
+		return fmt.Errorf("secure recipe policy directory %q: %w", directory, err)
+	}
 	if info, statErr := os.Lstat(policyPath); statErr == nil {
 		if err := validatePolicyFile(policyPath, info); err != nil {
 			return err
@@ -464,6 +467,10 @@ func Save(p Policy) error {
 	if err := temporary.Chmod(0600); err != nil {
 		_ = temporary.Close()
 		return fmt.Errorf("set recipe policy permissions: %w", err)
+	}
+	if err := fileowner.SecurePath(temporaryPath, false); err != nil {
+		_ = temporary.Close()
+		return fmt.Errorf("secure temporary recipe policy: %w", err)
 	}
 	if n, err := temporary.Write(data); err != nil {
 		_ = temporary.Close()
@@ -548,10 +555,10 @@ func validatePolicyFile(policyPath string, info os.FileInfo) error {
 	if !info.Mode().IsRegular() {
 		return fmt.Errorf("recipe policy %q is not a regular file", policyPath)
 	}
-	if info.Mode().Perm()&0077 != 0 || info.Mode()&(os.ModeSetuid|os.ModeSetgid|os.ModeSticky) != 0 {
+	if !fileowner.PrivateFileModeSafe(info) {
 		return fmt.Errorf("recipe policy %q permissions must be no more permissive than 0600", policyPath)
 	}
-	if !fileowner.CurrentUserOwns(info) {
+	if !fileowner.CurrentUserOwnsPath(policyPath, info) {
 		return fmt.Errorf("recipe policy %q is not owned by the current user", policyPath)
 	}
 	return nil

@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+
+	"zenget/internal/fileowner"
 )
 
 func TestPathHonorsXDGConfigHome(t *testing.T) {
@@ -62,10 +65,12 @@ func TestAddSaveLoadAndRemoveTrustRecord(t *testing.T) {
 	if err := os.Chmod(project, 0755); err != nil {
 		t.Fatal(err)
 	}
+	secureTestPath(t, project, true)
 	manifestPath := filepath.Join(project, "zenget.json")
 	if err := os.WriteFile(manifestPath, []byte(`{"schema_version":1,"apps":[]}`), 0644); err != nil {
 		t.Fatal(err)
 	}
+	secureTestPath(t, manifestPath, false)
 
 	store := New()
 	record, changed, err := store.Add(manifestPath)
@@ -90,7 +95,8 @@ func TestAddSaveLoadAndRemoveTrustRecord(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := info.Mode().Perm(); got != 0600 {
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0600 {
+		got := info.Mode().Perm()
 		t.Fatalf("trust store mode = %04o, want 0600", got)
 	}
 	loaded, err := Load()
@@ -128,6 +134,9 @@ func TestLoadMissingReturnsEmptyCurrentStore(t *testing.T) {
 }
 
 func TestCheckPathSafetyRejectsUnsafeManifestAndDirectories(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX mode-bit rejection is covered on Unix; Windows ACL rejection has dedicated tests")
+	}
 	project := t.TempDir()
 	if err := os.Chmod(project, 0755); err != nil {
 		t.Fatal(err)
@@ -173,6 +182,9 @@ func TestCheckPathSafetyRejectsSymlinkAndInvalidRoot(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := os.Symlink(target, manifestPath); err != nil {
+		if runtime.GOOS == "windows" {
+			t.Skipf("creating a Windows symlink is unavailable: %v", err)
+		}
 		t.Fatal(err)
 	}
 	if err := CheckPathSafety(Record{ManifestPath: manifestPath, ProjectRoot: project}); err == nil || !strings.Contains(err.Error(), "symlink") {
@@ -184,6 +196,9 @@ func TestCheckPathSafetyRejectsSymlinkAndInvalidRoot(t *testing.T) {
 }
 
 func TestAddRejectsMissingAndUnsafePaths(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX mode-bit rejection is covered on Unix; Windows ACL rejection has dedicated tests")
+	}
 	store := New()
 	if _, _, err := store.Add(filepath.Join(t.TempDir(), "missing.json")); err == nil {
 		t.Fatal("Add() missing manifest error = nil")
@@ -232,6 +247,7 @@ func TestLoadRejectsMalformedOrUnsafeStore(t *testing.T) {
 			if err := os.WriteFile(path, []byte(test.data), 0600); err != nil {
 				t.Fatal(err)
 			}
+			secureTestPath(t, path, false)
 			if _, err := Load(); err == nil || !strings.Contains(err.Error(), test.want) {
 				t.Fatalf("Load() error = %v, want %q", err, test.want)
 			}
@@ -270,6 +286,9 @@ func TestLoadRejectsUnsafeStoreFileTypesAndModes(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+			if runtime.GOOS == "windows" && test.name == "unsafe mode" {
+				t.Skip("POSIX mode-bit rejection is covered on Unix; Windows ACL rejection has dedicated tests")
+			}
 			path, err := Path()
 			if err != nil {
 				t.Fatal(err)
@@ -278,6 +297,9 @@ func TestLoadRejectsUnsafeStoreFileTypesAndModes(t *testing.T) {
 				t.Fatal(err)
 			}
 			if err := test.make(path); err != nil {
+				if runtime.GOOS == "windows" {
+					t.Skipf("Windows filesystem does not provide this test fixture: %v", err)
+				}
 				t.Fatal(err)
 			}
 			if _, err := Load(); err == nil || !strings.Contains(err.Error(), test.want) {
@@ -348,12 +370,22 @@ func TestSaveRejectsExistingUnsafeTargets(t *testing.T) {
 				t.Fatal(err)
 			}
 			if err := test.make(path); err != nil {
+				if runtime.GOOS == "windows" {
+					t.Skipf("Windows filesystem does not provide this test fixture: %v", err)
+				}
 				t.Fatal(err)
 			}
 			if err := Save(New()); err == nil || !strings.Contains(err.Error(), test.want) {
 				t.Fatalf("Save() error = %v, want %q", err, test.want)
 			}
 		})
+	}
+}
+
+func secureTestPath(t *testing.T, path string, directory bool) {
+	t.Helper()
+	if err := fileowner.SecurePath(path, directory); err != nil {
+		t.Fatalf("SecurePath(%q) error = %v", path, err)
 	}
 }
 

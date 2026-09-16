@@ -18,9 +18,8 @@ import (
 
 const (
 	// SchemaVersion is the version of the project trust store format.
-	SchemaVersion   = 1
-	storeFileName   = "project-trust.json"
-	unsafeWriteMask = 0022
+	SchemaVersion = 1
+	storeFileName = "project-trust.json"
 )
 
 // Record grants path-based trust to one local manifest and its project root.
@@ -148,12 +147,18 @@ func Save(store Store) error {
 	if err := os.MkdirAll(directory, 0700); err != nil {
 		return fmt.Errorf("create trust store directory %q: %w", directory, err)
 	}
+	if err := fileowner.SecurePath(directory, true); err != nil {
+		return fmt.Errorf("secure trust store directory %q: %w", directory, err)
+	}
 	if info, statErr := os.Lstat(path); statErr == nil {
 		if info.Mode()&os.ModeSymlink != 0 {
 			return fmt.Errorf("refusing to replace trust store symlink %q", path)
 		}
 		if !info.Mode().IsRegular() {
 			return fmt.Errorf("trust store %q is not a regular file", path)
+		}
+		if err := validateOwnerAndMode(info, path, "trust store"); err != nil {
+			return err
 		}
 	} else if !os.IsNotExist(statErr) {
 		return fmt.Errorf("inspect trust store %q: %w", path, statErr)
@@ -185,6 +190,10 @@ func Save(store Store) error {
 	if err := temporary.Chmod(0600); err != nil {
 		_ = temporary.Close()
 		return fmt.Errorf("set trust store permissions: %w", err)
+	}
+	if err := fileowner.SecurePath(temporaryPath, false); err != nil {
+		_ = temporary.Close()
+		return fmt.Errorf("secure temporary trust store: %w", err)
 	}
 	if err := temporary.Sync(); err != nil {
 		_ = temporary.Close()
@@ -409,10 +418,11 @@ func absolutePath(value, label string) (string, error) {
 }
 
 func validateOwnerAndMode(info os.FileInfo, path, label string) error {
-	if info.Mode().Perm()&unsafeWriteMask != 0 {
+	modeSafe := fileowner.PrivateDirectoryModeSafe(info)
+	if !modeSafe {
 		return fmt.Errorf("%s %q is group/world writable", label, path)
 	}
-	if !fileowner.CurrentUserOwns(info) {
+	if !fileowner.CurrentUserOwnsPath(path, info) {
 		return fmt.Errorf("inspect %s %q: ownership is unavailable", label, path)
 	}
 	return nil

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -95,8 +96,11 @@ func TestConfigRoundTripIsAtomicAndDeterministic(t *testing.T) {
 		t.Fatalf("config is not sorted: %s", data)
 	}
 	info, err := os.Stat(path)
-	if err != nil || info.Mode().Perm() != 0600 {
-		t.Fatalf("config mode = %v, error = %v, want 0600", info.Mode().Perm(), err)
+	if err != nil {
+		t.Fatalf("config stat error = %v", err)
+	}
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0600 {
+		t.Fatalf("config mode = %v, want 0600", info.Mode().Perm())
 	}
 	loaded, err := LoadConfig()
 	if err != nil {
@@ -239,7 +243,7 @@ func TestCacheConstructorsAndPrivateFilesystemHelpers(t *testing.T) {
 	}
 	if info, err := os.Lstat(privateDir); err != nil {
 		t.Fatal(err)
-	} else if err := validatePrivateDirectory(info, "test directory"); err != nil {
+	} else if err := validatePrivateDirectoryAt(privateDir, info, "test directory"); err != nil {
 		t.Fatalf("validatePrivateDirectory(valid) error = %v", err)
 	}
 	if err := os.Chmod(privateDir, 0777); err != nil {
@@ -247,7 +251,7 @@ func TestCacheConstructorsAndPrivateFilesystemHelpers(t *testing.T) {
 	}
 	if info, err := os.Lstat(privateDir); err != nil {
 		t.Fatal(err)
-	} else if err := validatePrivateDirectory(info, "test directory"); err == nil {
+	} else if err := validatePrivateDirectoryAt(privateDir, info, "test directory"); err == nil {
 		t.Fatal("world-writable directory unexpectedly accepted")
 	}
 	if err := os.Chmod(privateDir, 0700|os.ModeSticky); err != nil {
@@ -255,7 +259,7 @@ func TestCacheConstructorsAndPrivateFilesystemHelpers(t *testing.T) {
 	}
 	if info, err := os.Lstat(privateDir); err != nil {
 		t.Fatal(err)
-	} else if err := validatePrivateDirectory(info, "test directory"); err == nil {
+	} else if err := validatePrivateDirectoryAt(privateDir, info, "test directory"); err == nil {
 		t.Fatal("sticky directory unexpectedly accepted")
 	}
 
@@ -274,7 +278,7 @@ func TestCacheConstructorsAndPrivateFilesystemHelpers(t *testing.T) {
 	}
 	if info, err := os.Lstat(privateFile); err != nil {
 		t.Fatal(err)
-	} else if err := validatePrivateFile(info, "test file"); err == nil {
+	} else if err := validatePrivateFileAt(privateFile, info, "test file"); err == nil {
 		t.Fatal("permissive file unexpectedly accepted")
 	}
 	linkFile := filepath.Join(filepath.Dir(privateFile), "link.json")
@@ -283,7 +287,7 @@ func TestCacheConstructorsAndPrivateFilesystemHelpers(t *testing.T) {
 	}
 	if info, err := os.Lstat(linkFile); err != nil {
 		t.Fatal(err)
-	} else if err := validatePrivateFile(info, "test file"); err == nil {
+	} else if err := validatePrivateFileAt(linkFile, info, "test file"); err == nil {
 		t.Fatal("symlink file unexpectedly accepted")
 	}
 

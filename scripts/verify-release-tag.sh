@@ -25,9 +25,34 @@ if [[ "$(git cat-file -t "$tag")" != "tag" ]]; then
   exit 1
 fi
 
-tag_object="$(git cat-file -p "$tag")"
-if ! grep -Eq '^(gpgsig|sshsig|x509sig) ' <<<"$tag_object"; then
-  echo "release tag must carry a GPG, SSH, or X.509 signature: $tag" >&2
+trusted_signers="${ZENGET_TRUSTED_GPG_FINGERPRINTS:-}"
+if [[ -z "$trusted_signers" ]]; then
+  echo "ZENGET_TRUSTED_GPG_FINGERPRINTS must name at least one trusted maintainer fingerprint" >&2
+  exit 1
+fi
+
+verification_output=""
+if ! verification_output="$(git verify-tag --raw "$tag" 2>&1)"; then
+  printf 'cryptographic tag signature verification failed for %s:\n%s\n' "$tag" "$verification_output" >&2
+  exit 1
+fi
+
+signer_fingerprint="$(awk '$1 == "[GNUPG:]" && $2 == "VALIDSIG" { print toupper($3); exit }' <<<"$verification_output")"
+if [[ -z "$signer_fingerprint" ]]; then
+  echo "tag $tag is not a verifiable GPG-signed tag; SSH/X.509 signatures are not enabled by this policy" >&2
+  exit 1
+fi
+
+trusted_match=0
+for trusted in ${trusted_signers//,/ }; do
+  trusted="${trusted//[[:space:]]/}"
+  if [[ "$trusted" =~ ^[[:xdigit:]]+$ && ( "${#trusted}" -eq 40 || "${#trusted}" -eq 64 ) && "${signer_fingerprint}" == "${trusted^^}" ]]; then
+    trusted_match=1
+    break
+  fi
+done
+if [[ "$trusted_match" -ne 1 ]]; then
+  echo "tag $tag was signed by untrusted GPG fingerprint $signer_fingerprint" >&2
   exit 1
 fi
 

@@ -19,6 +19,14 @@ release builds use Go 1.26.8 with `GOTOOLCHAIN=local`.
    git push origin vX.Y.Z
    ```
 
+   Set the repository variable `ZENGET_TRUSTED_GPG_FINGERPRINTS` to the
+   reviewed maintainer full GPG fingerprint(s) before pushing the tag. The release
+   workflow runs `git verify-tag --raw` and accepts only a cryptographically
+   valid annotated GPG tag whose signer matches that variable. Missing,
+   malformed, SSH/X.509, or unknown signatures fail closed; no private key is
+   stored in GitHub. Rotate the public fingerprint variable through a reviewed
+   repository-settings change.
+
    The release workflow rejects non-`vX.Y.Z` tags, lightweight or unsigned
    tags, tags outside `origin/main`, tags pointing at a different event commit,
    duplicate tags on the same commit, and tags that do not match `Version`.
@@ -30,7 +38,9 @@ reusable by the tag workflow. Each Go matrix job runs formatting, module
 integrity, `go vet`, tests, the 80% coverage gate, race tests, and a build.
 The focused lint job enables only `staticcheck`, `errcheck`, `ineffassign`,
 and `unused`; the vulnerability job runs pinned `govulncheck`. The
-`release-config` job validates GoReleaser and smoke-tests a snapshot.
+`Windows ownership tests` job runs the ACL-backed fileowner, registry,
+recipe-policy, and trust tests on `windows-latest`; the `release-config` job
+validates GoReleaser and smoke-tests a snapshot.
 
 `CodeQL` is a separate SHA-pinned workflow on pull requests, `main`, and a
 weekly schedule. It uses `pull_request`, never `pull_request_target`, so fork
@@ -38,6 +48,11 @@ code is not granted write-capable secrets. GitHub may downgrade
 `security-events: write` for fork pull requests; if GitHub cannot upload that
 analysis, the check remains visible as a failure and must be rerun from an
 eligible context.
+
+The `Weekly security scan` workflow runs the same pinned `govulncheck` on the
+default branch every Monday and exposes a manual dispatch. Advisory, database,
+or scanner failures remain failed checks and are never hidden by
+`continue-on-error`.
 
 On a valid version tag, `Release` reruns CI and CodeQL on the exact tagged
 source, builds these five archives with GoReleaser, and verifies them before
@@ -54,8 +69,9 @@ the publishing step:
 `checksums.txt` is a single SHA-256 manifest covering exactly those files.
 The archive verifier checks the manifest, executable count, root-level names,
 Unix executable bits, and Linux amd64 `zenget --help`. The verified files are
-then attested with GitHub build provenance. A later job rechecks the checksums
-after artifact transfer and creates or updates a **draft** release. Only that
+then checksum-verified and run natively on Linux amd64, macOS arm64, and
+Windows amd64 before attestation. A later job rechecks the checksums after
+artifact transfer and creates or updates a **draft** release. Only that
 publisher job has `contents: write`; the workflow never promotes a release.
 
 The maintainer reviews the draft asset list, checksums, generated notes, and
@@ -87,17 +103,23 @@ Enable repository-owned, active protections before the first stable release:
 - `main`: pull request review, stale-review dismissal, conversation
   resolution, no force-push or deletion, and required checks named
   `Go quality / 1.26.8`, `Go quality / 1.27.1`, `Focused static lint`,
-  `Go vulnerability scan`, `Release configuration snapshot`, and `CodeQL`;
+  `Go vulnerability scan`, `Windows ownership tests`,
+  `Release configuration snapshot`, and `CodeQL`;
 - `refs/tags/v*`: no creation except maintainers, no update/force-push, and no
   deletion.
 
-The current `tyutyutyu/zenget` repository is private on a GitHub plan that
-returns HTTP 403 for branch protection and repository rulesets, requiring
-GitHub Pro or a public repository. Until that account-level prerequisite is
-resolved, the workflows enforce the source/tag relationship and immutable
-release behavior they can enforce, while the branch/tag protection itself is
-an explicitly visible repository-settings prerequisite—not a silently weakened
-workflow check.
+The `tyutyutyu/zenget` repository is public. Visibility alone does not enable
+required reviews, checks, or immutable tag rules, so the repository-owned
+rulesets must be inspected and enabled separately. If the GitHub account lacks
+the administration permission or plan needed for those rulesets, the release
+workflow remains an explicit source/tag and artifact gate and the missing
+settings stay a visible release prerequisite.
+
+Windows configuration files use an ACL-backed ownership seam. The owner SID
+must match the current token, reparse points and NULL DACLs are rejected, and
+write access granted to untrusted principals fails closed. New registry,
+recipe-policy, trust, and cache paths receive an owner/SYSTEM/Administrators
+ACL before they are populated; Unix continues to enforce uid and mode bits.
 
 Release provenance is provenance for zenget's own published files. It does not
 enable runtime attestation verification for releases installed by zenget;
