@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"zenget/internal/fileowner"
 	"zenget/internal/recipe"
 	"zenget/internal/recipepolicy"
 )
@@ -230,10 +231,17 @@ func TestCacheConstructorsAndPrivateFilesystemHelpers(t *testing.T) {
 	fallbackHome := t.TempDir()
 	t.Setenv("XDG_CACHE_HOME", "")
 	t.Setenv("HOME", fallbackHome)
-	if got, err := CacheRoot(); err != nil || got != filepath.Join(fallbackHome, ".cache", "zenget", "registries") {
+	expectedHome := fallbackHome
+	if runtime.GOOS == "windows" {
+		expectedHome, err = os.UserHomeDir()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got, err := CacheRoot(); err != nil || got != filepath.Join(expectedHome, ".cache", "zenget", "registries") {
 		t.Fatalf("fallback CacheRoot() = %q, error %v", got, err)
 	}
-	if got, err := Path(); err != nil || got != filepath.Join(fallbackHome, ".config", "zenget", ConfigFileName) {
+	if got, err := Path(); err != nil || got != filepath.Join(expectedHome, ".config", "zenget", ConfigFileName) {
 		t.Fatalf("fallback Path() = %q, error %v", got, err)
 	}
 
@@ -246,25 +254,30 @@ func TestCacheConstructorsAndPrivateFilesystemHelpers(t *testing.T) {
 	} else if err := validatePrivateDirectoryAt(privateDir, info, "test directory"); err != nil {
 		t.Fatalf("validatePrivateDirectory(valid) error = %v", err)
 	}
-	if err := os.Chmod(privateDir, 0777); err != nil {
-		t.Fatal(err)
-	}
-	if info, err := os.Lstat(privateDir); err != nil {
-		t.Fatal(err)
-	} else if err := validatePrivateDirectoryAt(privateDir, info, "test directory"); err == nil {
-		t.Fatal("world-writable directory unexpectedly accepted")
-	}
-	if err := os.Chmod(privateDir, 0700|os.ModeSticky); err != nil {
-		t.Fatal(err)
-	}
-	if info, err := os.Lstat(privateDir); err != nil {
-		t.Fatal(err)
-	} else if err := validatePrivateDirectoryAt(privateDir, info, "test directory"); err == nil {
-		t.Fatal("sticky directory unexpectedly accepted")
+	if runtime.GOOS != "windows" {
+		if err := os.Chmod(privateDir, 0777); err != nil {
+			t.Fatal(err)
+		}
+		if info, err := os.Lstat(privateDir); err != nil {
+			t.Fatal(err)
+		} else if err := validatePrivateDirectoryAt(privateDir, info, "test directory"); err == nil {
+			t.Fatal("world-writable directory unexpectedly accepted")
+		}
+		if err := os.Chmod(privateDir, 0700|os.ModeSticky); err != nil {
+			t.Fatal(err)
+		}
+		if info, err := os.Lstat(privateDir); err != nil {
+			t.Fatal(err)
+		} else if err := validatePrivateDirectoryAt(privateDir, info, "test directory"); err == nil {
+			t.Fatal("sticky directory unexpectedly accepted")
+		}
 	}
 
 	privateFile := filepath.Join(t.TempDir(), "private.json")
 	if err := os.WriteFile(privateFile, []byte("{}"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := fileowner.SecurePath(privateFile, false); err != nil {
 		t.Fatal(err)
 	}
 	if data, err := readPrivateFile(privateFile, "test file"); err != nil || string(data) != "{}" {
@@ -273,13 +286,15 @@ func TestCacheConstructorsAndPrivateFilesystemHelpers(t *testing.T) {
 	if _, err := readPrivateFile(filepath.Join(filepath.Dir(privateFile), "missing"), "test file"); err == nil {
 		t.Fatal("missing readPrivateFile() unexpectedly succeeded")
 	}
-	if err := os.Chmod(privateFile, 0644); err != nil {
-		t.Fatal(err)
-	}
-	if info, err := os.Lstat(privateFile); err != nil {
-		t.Fatal(err)
-	} else if err := validatePrivateFileAt(privateFile, info, "test file"); err == nil {
-		t.Fatal("permissive file unexpectedly accepted")
+	if runtime.GOOS != "windows" {
+		if err := os.Chmod(privateFile, 0644); err != nil {
+			t.Fatal(err)
+		}
+		if info, err := os.Lstat(privateFile); err != nil {
+			t.Fatal(err)
+		} else if err := validatePrivateFileAt(privateFile, info, "test file"); err == nil {
+			t.Fatal("permissive file unexpectedly accepted")
+		}
 	}
 	linkFile := filepath.Join(filepath.Dir(privateFile), "link.json")
 	if err := os.Symlink(privateFile, linkFile); err != nil {
@@ -339,6 +354,9 @@ func TestStrictMetadataAndMarshalValidation(t *testing.T) {
 }
 
 func TestRegistryConfigRejectsInsecureExistingFile(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX mode-bit rejection is covered on Unix; Windows ACL rejection has dedicated tests")
+	}
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	config := DefaultConfig()
 	if _, err := config.Add("stable", "github:acme/catalog@"+testCommit+":recipes"); err != nil {
@@ -602,6 +620,9 @@ func TestCacheRejectsCorruptRecipeWithoutFallback(t *testing.T) {
 }
 
 func TestCacheLoadFailsClosedForSnapshotTampering(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("snapshot mode and symlink tampering fixtures are covered on Unix")
+	}
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	source := mustSource(t, "github:acme/registry@"+testCommit+":catalog")
 	if err := recipepolicy.Save(recipepolicy.Policy{SchemaVersion: recipepolicy.SchemaVersion, Allow: []recipepolicy.Rule{{

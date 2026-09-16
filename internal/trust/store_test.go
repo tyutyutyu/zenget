@@ -30,6 +30,13 @@ func TestPathUsesHomeWhenXDGConfigHomeIsUnset(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_CONFIG_HOME", "")
+	if runtime.GOOS == "windows" {
+		resolvedHome, err := os.UserHomeDir()
+		if err != nil {
+			t.Fatal(err)
+		}
+		home = resolvedHome
+	}
 
 	got, err := Path()
 	if err != nil {
@@ -279,7 +286,12 @@ func TestLoadRejectsUnsafeStoreFileTypesAndModes(t *testing.T) {
 		},
 		{
 			name: "unsafe mode",
-			make: func(path string) error { return os.WriteFile(path, []byte(`{"schema_version":1,"projects":[]}`), 0664) },
+			make: func(path string) error {
+				if err := os.WriteFile(path, []byte(`{"schema_version":1,"projects":[]}`), 0664); err != nil {
+					return err
+				}
+				return os.Chmod(path, 0664)
+			},
 			want: "group/world writable",
 		},
 	}

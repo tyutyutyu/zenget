@@ -639,6 +639,9 @@ func (c *Cache) Save(source Source, index Index, recipes map[string][]byte) erro
 			_ = os.RemoveAll(staging)
 		}
 	}()
+	if err := fileowner.SecurePath(staging, true); err != nil {
+		return fmt.Errorf("secure registry snapshot staging directory: %w", err)
+	}
 	if err := writeSnapshotFiles(staging, normalizedSource, indexData, indexDigest, index, recipes); err != nil {
 		return err
 	}
@@ -783,8 +786,8 @@ func writeSnapshotFiles(directory string, source Source, indexData []byte, index
 	if err := os.Mkdir(recipesDirectory, 0700); err != nil {
 		return fmt.Errorf("create registry recipe directory: %w", err)
 	}
-	if err := os.Chmod(recipesDirectory, 0700); err != nil {
-		return fmt.Errorf("set registry recipe directory permissions: %w", err)
+	if err := fileowner.SecurePath(recipesDirectory, true); err != nil {
+		return fmt.Errorf("secure registry recipe directory: %w", err)
 	}
 	for _, entry := range index.Entries {
 		digest := entry.SHA256
