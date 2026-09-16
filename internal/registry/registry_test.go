@@ -559,6 +559,9 @@ func TestCachePublishesAndValidatesOneActiveSnapshot(t *testing.T) {
 	if err := os.WriteFile(pointerPath, pointerData, 0600); err != nil {
 		t.Fatal(err)
 	}
+	if err := fileowner.SecurePath(pointerPath, false); err != nil {
+		t.Fatalf("SecurePath(pointer) error = %v", err)
+	}
 	entry, got, err := cache.Lookup(source, "acme/widget")
 	if err != nil {
 		t.Fatalf("Lookup() error = %v", err)
