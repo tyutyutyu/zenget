@@ -230,6 +230,7 @@ func TestCacheConstructorsAndPrivateFilesystemHelpers(t *testing.T) {
 
 	fallbackHome := t.TempDir()
 	t.Setenv("XDG_CACHE_HOME", "")
+	t.Setenv("XDG_CONFIG_HOME", "")
 	t.Setenv("HOME", fallbackHome)
 	expectedHome := fallbackHome
 	if runtime.GOOS == "windows" {

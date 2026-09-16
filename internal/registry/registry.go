@@ -668,6 +668,9 @@ func (c *Cache) Save(source Source, index Index, recipes map[string][]byte) erro
 			return fmt.Errorf("publish registry snapshot: %w", err)
 		}
 		removeStaging = false
+		if err := fileowner.SecurePath(final, true); err != nil {
+			return fmt.Errorf("secure registry snapshot: %w", err)
+		}
 	}
 	pointer := snapshotPointer{SchemaVersion: SchemaVersion, Source: normalizedSource.String(), IndexSHA256: indexDigest}
 	pointerData, err := marshalPointer(pointer)
@@ -1241,6 +1244,9 @@ func atomicWrite(destination, directory, pattern string, data []byte, mode os.Fi
 		return fmt.Errorf("replace %s: %w", kind, err)
 	}
 	remove = false
+	if err := fileowner.SecurePath(destination, false); err != nil {
+		return fmt.Errorf("secure %s after replacement: %w", kind, err)
+	}
 	return nil
 }
 

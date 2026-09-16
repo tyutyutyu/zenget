@@ -206,6 +206,9 @@ func Save(store Store) error {
 		return fmt.Errorf("replace trust store %q: %w", path, err)
 	}
 	removeTemporary = false
+	if err := fileowner.SecurePath(path, false); err != nil {
+		return fmt.Errorf("secure trust store after replacement: %w", err)
+	}
 	return nil
 }
 

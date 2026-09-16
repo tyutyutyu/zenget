@@ -500,6 +500,9 @@ func Save(p Policy) error {
 		return fmt.Errorf("replace recipe policy %q: %w", policyPath, err)
 	}
 	removeTemporary = false
+	if err := fileowner.SecurePath(policyPath, false); err != nil {
+		return fmt.Errorf("secure recipe policy after replacement: %w", err)
+	}
 	return nil
 }
 
