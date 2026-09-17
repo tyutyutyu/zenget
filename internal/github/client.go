@@ -305,7 +305,7 @@ func (c *Client) ContentsAtCommit(ctx context.Context, org, repo, commit, filePa
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.Request == nil || !sameOrigin(resp.Request.URL.String(), c.BaseURL) {
 		return nil, errors.New("GitHub contents response crossed an untrusted host")
 	}
@@ -451,7 +451,7 @@ func (c *Client) listReleasesPage(ctx context.Context, org, repo string, page in
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, responseError(resp)
@@ -483,7 +483,7 @@ func (c *Client) decodeRelease(ctx context.Context, endpoint, context string) (*
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, responseError(resp)

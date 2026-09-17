@@ -1916,7 +1916,7 @@ func writeBz2(t *testing.T, assetPath string, contents []byte) {
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
-	defer out.Close()
+	defer func() { _ = out.Close() }()
 
 	cmd := bzip2Compress(t, contents)
 	cmd.Stdout = out
@@ -1931,7 +1931,7 @@ func writeXz(t *testing.T, assetPath string, contents []byte) {
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	xzWriter, err := xz.NewWriter(file)
 	if err != nil {
@@ -1951,7 +1951,7 @@ func writeZst(t *testing.T, assetPath string, contents []byte) {
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	zstWriter, err := zstd.NewWriter(file)
 	if err != nil {
@@ -1971,7 +1971,7 @@ func writeTar(t *testing.T, assetPath string, files []archiveFile) {
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	writeTarTo(t, file, files)
 }
 
@@ -1981,10 +1981,10 @@ func writeTarGz(t *testing.T, assetPath string, files []archiveFile) {
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	gzipWriter := gzip.NewWriter(file)
-	defer gzipWriter.Close()
+	defer func() { _ = gzipWriter.Close() }()
 	writeTarTo(t, gzipWriter, files)
 }
 
@@ -1994,13 +1994,13 @@ func writeTarXz(t *testing.T, assetPath string, files []archiveFile) {
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	xzWriter, err := xz.NewWriter(file)
 	if err != nil {
 		t.Fatalf("xz NewWriter() error = %v", err)
 	}
-	defer xzWriter.Close()
+	defer func() { _ = xzWriter.Close() }()
 	writeTarTo(t, xzWriter, files)
 }
 
@@ -2010,13 +2010,13 @@ func writeTarZst(t *testing.T, assetPath string, files []archiveFile) {
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	zstWriter, err := zstd.NewWriter(file)
 	if err != nil {
 		t.Fatalf("zstd NewWriter() error = %v", err)
 	}
-	defer zstWriter.Close()
+	defer func() { _ = zstWriter.Close() }()
 	writeTarTo(t, zstWriter, files)
 }
 
@@ -2026,7 +2026,7 @@ func writeTarBz2(t *testing.T, assetPath string, files []archiveFile) {
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
-	defer out.Close()
+	defer func() { _ = out.Close() }()
 
 	cmd := bzip2Compress(t, nil)
 	cmd.Stdout = out

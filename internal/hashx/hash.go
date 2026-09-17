@@ -15,7 +15,7 @@ func File(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	h := xxh3.New()
 	if _, err := io.Copy(h, f); err != nil {
@@ -27,6 +27,6 @@ func File(path string) (string, error) {
 // Bytes returns the XXH3-64 hash of b as a lowercase hex string.
 func Bytes(b []byte) string {
 	h := xxh3.New()
-	h.Write(b)
+	_, _ = h.Write(b)
 	return hex.EncodeToString(h.Sum(nil))
 }

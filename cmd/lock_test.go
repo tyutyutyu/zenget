@@ -279,11 +279,11 @@ func TestLockHelpersRejectInvalidInputs(t *testing.T) {
 	}
 
 	failedPlan := []applyPlanEntry{{manifest: state.ManifestApp{Repository: "acme/widget"}, status: applyFailed, reason: "release unavailable"}}
-	if _, err := preflightLockedAssets(nil, nil, failedPlan, lockfile.Lockfile{}); err == nil || !strings.Contains(err.Error(), "release unavailable") {
+	if _, err := preflightLockedAssets(nil, nil, failedPlan, lockfile.Lockfile{}); err == nil || !strings.Contains(err.Error(), "release unavailable") { //nolint:staticcheck // this test covers nil-context normalization
 		t.Fatalf("failed plan preflight error = %v", err)
 	}
 	missingLockPlan := []applyPlanEntry{{manifest: state.ManifestApp{Repository: "acme/widget"}, status: applyInstall}}
-	if _, err := preflightLockedAssets(nil, nil, missingLockPlan, lockfile.Lockfile{}); err == nil || !strings.Contains(err.Error(), "lock entry is missing") {
+	if _, err := preflightLockedAssets(nil, nil, missingLockPlan, lockfile.Lockfile{}); err == nil || !strings.Contains(err.Error(), "lock entry is missing") { //nolint:staticcheck // this test covers nil-context normalization
 		t.Fatalf("missing lock entry preflight error = %v", err)
 	}
 }

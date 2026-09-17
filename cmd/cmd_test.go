@@ -205,8 +205,7 @@ func TestRunInstallWithClientDownloadError(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
-	var server *httptest.Server
-	server = releaseServer(t, nil, http.NotFound)
+	server := releaseServer(t, nil, http.NotFound)
 	// The release payload needs the final server URL, so build it after start.
 	server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/repos/acme/widget/releases/latest" {
@@ -229,8 +228,7 @@ func TestRunInstallWithClientExtractError(t *testing.T) {
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
-	var server *httptest.Server
-	server = releaseServer(t, nil, http.NotFound)
+	server := releaseServer(t, nil, http.NotFound)
 	server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/repos/acme/widget/releases/latest" {
 			_ = json.NewEncoder(w).Encode(releasePayload(server, "widget.tar.gz"))
@@ -255,8 +253,7 @@ func TestRunInstallWithClientNilContextAndOutput(t *testing.T) {
 
 	binary := []byte("#!/bin/sh\necho widget\n")
 	asset := tarGzAsset(t, "widget", binary)
-	var server *httptest.Server
-	server = releaseServer(t, nil, http.NotFound)
+	server := releaseServer(t, nil, http.NotFound)
 	server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/repos/acme/widget/releases/latest" {
 			_ = json.NewEncoder(w).Encode(releasePayload(server, "widget.tar.gz"))
@@ -267,7 +264,7 @@ func TestRunInstallWithClientNilContextAndOutput(t *testing.T) {
 
 	client := github.New()
 	client.BaseURL = server.URL
-	if err := runInstallWithClient(nil, client, "acme/widget", "", "", "", "", nil); err != nil {
+	if err := runInstallWithClient(nil, client, "acme/widget", "", "", "", "", nil); err != nil { //nolint:staticcheck // this test covers nil-context normalization
 		t.Fatalf("install: %v", err)
 	}
 	if _, err := os.Stat(home + "/.local/bin/widget"); err != nil {

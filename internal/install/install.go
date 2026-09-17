@@ -648,7 +648,7 @@ func readPrefix(assetPath string, size int) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	return io.ReadAll(io.LimitReader(file, int64(size)))
 }
@@ -662,7 +662,7 @@ func compressedStreamHasTarMagic(assetPath string, format Format) bool {
 	if err != nil {
 		return false
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	var reader io.Reader
 	var closeReader io.Closer
@@ -686,7 +686,7 @@ func compressedStreamHasTarMagic(assetPath string, format Format) bool {
 		return false
 	}
 	if closeReader != nil {
-		defer closeReader.Close()
+		defer func() { _ = closeReader.Close() }()
 	}
 
 	prefix, err := io.ReadAll(io.LimitReader(reader, int64(sniffHeaderSize)))
@@ -892,13 +892,13 @@ func extractTarGz(assetPath string, resourceLimits limits.Limits) ([]archiveCand
 	if err != nil {
 		return nil, fmt.Errorf("open tar.gz asset %q: %w", assetPath, err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	reader, err := gzip.NewReader(file)
 	if err != nil {
 		return nil, fmt.Errorf("open gzip asset %q: %w", assetPath, err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	return extractTar(reader, assetPath, "tar.gz", resourceLimits)
 }
@@ -908,7 +908,7 @@ func extractTarXz(assetPath string, resourceLimits limits.Limits) ([]archiveCand
 	if err != nil {
 		return nil, fmt.Errorf("open tar.xz asset %q: %w", assetPath, err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	reader, err := xz.NewReader(file)
 	if err != nil {
@@ -923,7 +923,7 @@ func extractTarBz2(assetPath string, resourceLimits limits.Limits) ([]archiveCan
 	if err != nil {
 		return nil, fmt.Errorf("open tar.bz2 asset %q: %w", assetPath, err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	return extractTar(bzip2.NewReader(file), assetPath, "tar.bz2", resourceLimits)
 }
@@ -933,7 +933,7 @@ func extractTarZst(assetPath string, resourceLimits limits.Limits) ([]archiveCan
 	if err != nil {
 		return nil, fmt.Errorf("open tar.zst asset %q: %w", assetPath, err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	reader, err := zstd.NewReader(file)
 	if err != nil {
@@ -949,7 +949,7 @@ func extractTarFile(assetPath string, resourceLimits limits.Limits) ([]archiveCa
 	if err != nil {
 		return nil, fmt.Errorf("open tar asset %q: %w", assetPath, err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	return extractTar(file, assetPath, "tar", resourceLimits)
 }
@@ -1008,13 +1008,13 @@ func decompressGz(assetPath string, maxBytes int64) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open gzip asset %q: %w", assetPath, err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	reader, err := gzip.NewReader(file)
 	if err != nil {
 		return nil, fmt.Errorf("open gzip asset %q: %w", assetPath, err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	contents, err := limits.ReadAll(reader, maxBytes, "binary candidate bytes", assetPath)
 	if err != nil {
@@ -1028,7 +1028,7 @@ func decompressBz2(assetPath string, maxBytes int64) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open bzip2 asset %q: %w", assetPath, err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	contents, err := limits.ReadAll(bzip2.NewReader(bufio.NewReader(file)), maxBytes, "binary candidate bytes", assetPath)
 	if err != nil {
@@ -1042,7 +1042,7 @@ func decompressXz(assetPath string, maxBytes int64) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open xz asset %q: %w", assetPath, err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	reader, err := xz.NewReader(file)
 	if err != nil {
@@ -1061,7 +1061,7 @@ func decompressZst(assetPath string, maxBytes int64) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open zstd asset %q: %w", assetPath, err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	reader, err := zstd.NewReader(file)
 	if err != nil {
@@ -1081,7 +1081,7 @@ func extractZip(assetPath string, resourceLimits limits.Limits) ([]archiveCandid
 	if err != nil {
 		return nil, fmt.Errorf("open zip asset %q: %w", assetPath, err)
 	}
-	defer archive.Close()
+	defer func() { _ = archive.Close() }()
 	if int64(len(archive.File)) > resourceLimits.ArchiveEntries {
 		return nil, &limits.LimitError{
 			Kind:  "archive entry count",

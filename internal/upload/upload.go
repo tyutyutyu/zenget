@@ -374,7 +374,7 @@ func MaybeUpload(ctx context.Context, cfg *config.Config, client HTTPClient, clo
 	if err != nil {
 		return fmt.Errorf("post upload: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("upload returned HTTP %d", resp.StatusCode)

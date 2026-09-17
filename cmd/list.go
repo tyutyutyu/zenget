@@ -54,10 +54,11 @@ const (
 )
 
 var listCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List installed applications",
-	Args:  validateListArgs,
-	RunE:  runList,
+	Use:     "list",
+	Aliases: []string{"ls", "l"},
+	Short:   "List installed applications",
+	Args:    validateListArgs,
+	RunE:    runList,
 }
 
 func init() {

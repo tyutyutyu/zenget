@@ -14,8 +14,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"syscall"
 
+	"zenget/internal/fileowner"
 	"zenget/internal/limits"
 )
 
@@ -413,7 +413,7 @@ func Load() (Policy, error) {
 	if err != nil {
 		return Policy{}, fmt.Errorf("open recipe policy %q: %w", policyPath, err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	data, err := limits.ReadAll(file, limits.DefaultStructuredBytes, "recipe policy", policyPath)
 	if err != nil {
 		return Policy{}, fmt.Errorf("read recipe policy %q: %w", policyPath, err)
@@ -436,6 +436,9 @@ func Save(p Policy) error {
 	directory := filepath.Dir(policyPath)
 	if err := os.MkdirAll(directory, 0700); err != nil {
 		return fmt.Errorf("create recipe policy directory %q: %w", directory, err)
+	}
+	if err := fileowner.SecurePath(directory, true); err != nil {
+		return fmt.Errorf("secure recipe policy directory %q: %w", directory, err)
 	}
 	if info, statErr := os.Lstat(policyPath); statErr == nil {
 		if err := validatePolicyFile(policyPath, info); err != nil {
@@ -465,6 +468,10 @@ func Save(p Policy) error {
 		_ = temporary.Close()
 		return fmt.Errorf("set recipe policy permissions: %w", err)
 	}
+	if err := fileowner.SecurePath(temporaryPath, false); err != nil {
+		_ = temporary.Close()
+		return fmt.Errorf("secure temporary recipe policy: %w", err)
+	}
 	if n, err := temporary.Write(data); err != nil {
 		_ = temporary.Close()
 		return fmt.Errorf("write temporary recipe policy: %w", err)
@@ -493,6 +500,9 @@ func Save(p Policy) error {
 		return fmt.Errorf("replace recipe policy %q: %w", policyPath, err)
 	}
 	removeTemporary = false
+	if err := fileowner.SecurePath(policyPath, false); err != nil {
+		return fmt.Errorf("secure recipe policy after replacement: %w", err)
+	}
 	return nil
 }
 
@@ -548,11 +558,10 @@ func validatePolicyFile(policyPath string, info os.FileInfo) error {
 	if !info.Mode().IsRegular() {
 		return fmt.Errorf("recipe policy %q is not a regular file", policyPath)
 	}
-	if info.Mode().Perm()&0077 != 0 || info.Mode()&(os.ModeSetuid|os.ModeSetgid|os.ModeSticky) != 0 {
+	if !fileowner.PrivateFileModeSafe(info) {
 		return fmt.Errorf("recipe policy %q permissions must be no more permissive than 0600", policyPath)
 	}
-	stat, ok := info.Sys().(*syscall.Stat_t)
-	if !ok || uint32(os.Geteuid()) != stat.Uid {
+	if !fileowner.CurrentUserOwnsPath(policyPath, info) {
 		return fmt.Errorf("recipe policy %q is not owned by the current user", policyPath)
 	}
 	return nil

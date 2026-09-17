@@ -50,7 +50,7 @@ func TestLatestReleaseParsesResponse(t *testing.T) {
 			t.Errorf("User-Agent header = %q, want zenget", got)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, `{"tag_name":"v1.2.3","published_at":"2026-08-25T10:00:00Z","assets":[{"name":"widget-linux-amd64","url":"https://api.github.com/repos/acme/widget/releases/assets/1","browser_download_url":"https://example.com/widget","digest":"sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"name":"widget-darwin-arm64","browser_download_url":"https://example.com/widget-darwin"}]}`)
+		_, _ = fmt.Fprint(w, `{"tag_name":"v1.2.3","published_at":"2026-08-25T10:00:00Z","assets":[{"name":"widget-linux-amd64","url":"https://api.github.com/repos/acme/widget/releases/assets/1","browser_download_url":"https://example.com/widget","digest":"sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"name":"widget-darwin-arm64","browser_download_url":"https://example.com/widget-darwin"}]}`)
 	}))
 	defer server.Close()
 
@@ -414,7 +414,7 @@ func TestLatestReleaseSendsOptionalAuthorization(t *testing.T) {
 				if got := r.Header.Get("Authorization"); got != test.wantAuth {
 					t.Errorf("Authorization header = %q, want %q", got, test.wantAuth)
 				}
-				fmt.Fprint(w, `{"tag_name":"v1.0.0","assets":[]}`)
+				_, _ = fmt.Fprint(w, `{"tag_name":"v1.0.0","assets":[]}`)
 			}))
 			defer server.Close()
 
@@ -450,7 +450,7 @@ func TestLatestReleaseNonOKIncludesStatusAndBody(t *testing.T) {
 func TestDownloadAssetWritesBytes(t *testing.T) {
 	const want = "zenget asset contents\n"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, want)
+		_, _ = fmt.Fprint(w, want)
 	}))
 	defer server.Close()
 
@@ -747,7 +747,7 @@ func TestDownloadAssetRequiresDownloadURL(t *testing.T) {
 func TestLatestReleaseMalformedJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, `{"tag_name":`)
+		_, _ = fmt.Fprint(w, `{"tag_name":`)
 	}))
 	defer server.Close()
 
@@ -797,7 +797,7 @@ func TestLatestReleaseEmptyErrorBody(t *testing.T) {
 
 func TestLatestReleaseNilHTTPClient(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, `{"tag_name":"v2.0.0","assets":[]}`)
+		_, _ = fmt.Fprint(w, `{"tag_name":"v2.0.0","assets":[]}`)
 	}))
 	defer server.Close()
 
@@ -839,7 +839,7 @@ func TestDownloadAssetInvalidURL(t *testing.T) {
 
 func TestDownloadAssetUncreatableDestination(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, "zenget asset contents\n")
+		_, _ = fmt.Fprint(w, "zenget asset contents\n")
 	}))
 	defer server.Close()
 
@@ -857,7 +857,7 @@ func TestDownloadAssetUncreatableDestination(t *testing.T) {
 func TestDownloadAssetTruncatedBodyRemovesPartialFile(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Length", "100")
-		fmt.Fprint(w, "short")
+		_, _ = fmt.Fprint(w, "short")
 	}))
 	defer server.Close()
 
@@ -878,7 +878,7 @@ func TestDownloadAssetTruncatedBodyRemovesPartialFile(t *testing.T) {
 func TestDownloadAssetFailureRemovesPartialFile(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprint(w, "server failure")
+		_, _ = fmt.Fprint(w, "server failure")
 	}))
 	defer server.Close()
 
@@ -1343,7 +1343,7 @@ func TestReleaseByTagParsesResponse(t *testing.T) {
 			t.Errorf("request path = %s, want /repos/acme/widget/releases/tags/v1.2.3", r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, `{"tag_name":"v1.2.3","published_at":"2026-08-25T10:00:00Z","assets":[{"name":"widget","browser_download_url":"https://example.com/widget"}]}`)
+		_, _ = fmt.Fprint(w, `{"tag_name":"v1.2.3","published_at":"2026-08-25T10:00:00Z","assets":[{"name":"widget","browser_download_url":"https://example.com/widget"}]}`)
 	}))
 	defer server.Close()
 
@@ -1390,7 +1390,7 @@ func TestListReleasesParsesResponse(t *testing.T) {
 			t.Errorf("request query = %q, want empty for the default page", r.URL.RawQuery)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, `[{"tag_name":"v1.2.3","published_at":"2026-08-25T10:00:00Z","assets":[]},{"tag_name":"v1.2.2","published_at":"2026-08-20T10:00:00Z","assets":[]}]`)
+		_, _ = fmt.Fprint(w, `[{"tag_name":"v1.2.3","published_at":"2026-08-25T10:00:00Z","assets":[]},{"tag_name":"v1.2.2","published_at":"2026-08-20T10:00:00Z","assets":[]}]`)
 	}))
 	defer server.Close()
 
@@ -1461,7 +1461,7 @@ func TestListReleasesAllFetchesAllPages(t *testing.T) {
 func TestListReleasesEmptyResponse(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, `[]`)
+		_, _ = fmt.Fprint(w, `[]`)
 	}))
 	defer server.Close()
 
