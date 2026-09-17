@@ -1,6 +1,86 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended"
+    "config:best-practices"
+  ],
+  "timezone": "Europe/Budapest",
+  "dependencyDashboard": true,
+  "dependencyDashboardOSVVulnerabilitySummary": "all",
+  "osvVulnerabilityAlerts": true,
+  "minimumReleaseAge": "14 days",
+  "minimumReleaseAgeBehaviour": "timestamp-required",
+  "internalChecksFilter": "strict",
+  "internalChecksAsSuccess": false,
+  "prCreation": "immediate",
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "rebaseWhen": "behind-base-branch",
+  "automerge": false,
+  "automergeType": "pr",
+  "automergeStrategy": "squash",
+  "platformAutomerge": false,
+  "ignoreTests": false,
+  "lockFileMaintenance": {
+    "enabled": false
+  },
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "minimumReleaseAge": "0 days",
+    "dependencyDashboardApproval": false,
+    "automerge": false,
+    "groupName": null,
+    "vulnerabilityFixStrategy": "lowest"
+  },
+  "packageRules": [
+    {
+      "description": "Automerge stable root Go module minor and patch updates only after CI passes.",
+      "matchManagers": ["gomod"],
+      "matchFileNames": ["go.mod"],
+      "matchDepTypes": ["require", "indirect"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "matchCurrentVersion": ">=1.0.0",
+      "automerge": true
+    },
+    {
+      "description": "Automerge stable GitHub Actions minor and patch updates after CI passes.",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "matchCurrentVersion": "/^v?[1-9]\\d*(?:\\.\\d+){0,2}$/",
+      "automerge": true
+    },
+    {
+      "description": "Keep GitHub Actions pinned and automerge digest refreshes after the release-age and CI gates.",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["digest", "pinDigest"],
+      "automerge": true
+    },
+    {
+      "description": "Pinning the current Action version adds integrity without upgrading its version.",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["pinDigest"],
+      "minimumReleaseAge": "0 days"
+    },
+    {
+      "description": "Require dashboard approval before opening major upgrade PRs.",
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true,
+      "automerge": false
+    },
+    {
+      "description": "Pre-1.0 dependencies can break compatibility in minor or patch releases.",
+      "matchCurrentVersion": "/^v?0\\./",
+      "automerge": false
+    },
+    {
+      "description": "Go and toolchain directives define supported compiler versions and require review.",
+      "matchManagers": ["gomod"],
+      "matchDepTypes": ["golang", "toolchain"],
+      "automerge": false
+    },
+    {
+      "description": "The offline attestation spike has no dependency tests in the repository CI.",
+      "matchFileNames": ["tools/attestation-harness/**"],
+      "automerge": false
+    }
   ]
 }
