@@ -8,7 +8,7 @@ require (
 	github.com/spf13/pflag v1.0.9
 	github.com/ulikunitz/xz v0.5.16
 	github.com/zeebo/xxh3 v1.1.0
-	golang.org/x/sys v0.30.0
+	golang.org/x/sys v0.48.0
 )
 
 require (
