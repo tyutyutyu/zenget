@@ -15,10 +15,11 @@ import (
 )
 
 var uninstallCmd = &cobra.Command{
-	Use:   "uninstall <name|org/repo>",
-	Short: "Remove an installed binary and its registry entry",
-	Args:  cobra.ExactArgs(1),
-	RunE:  runUninstall,
+	Use:     "uninstall <name|org/repo>",
+	Aliases: []string{"rm", "un"},
+	Short:   "Remove an installed binary and its registry entry",
+	Args:    cobra.ExactArgs(1),
+	RunE:    runUninstall,
 }
 
 func init() {

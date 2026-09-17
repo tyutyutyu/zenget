@@ -12,11 +12,12 @@ import (
 )
 
 var configCmd = &cobra.Command{
-	Use:   "config",
-	Short: "Show or change zenget configuration",
-	Long:  "Show or change zenget configuration. checksum_policy is if-present or required (default if-present; there is no off mode). lazy_install is disabled by default and enables trusted project-shim cache-miss downloads. Resource limits use finite positive int64 values; byte limits accept B, KiB, MiB, or GiB suffixes.",
-	Args:  cobra.NoArgs,
-	RunE:  runConfig,
+	Use:     "config",
+	Aliases: []string{"cfg"},
+	Short:   "Show or change zenget configuration",
+	Long:    "Show or change zenget configuration. checksum_policy is if-present or required (default if-present; there is no off mode). lazy_install is disabled by default and enables trusted project-shim cache-miss downloads. Resource limits use finite positive int64 values; byte limits accept B, KiB, MiB, or GiB suffixes.",
+	Args:    cobra.NoArgs,
+	RunE:    runConfig,
 }
 
 var configSetCmd = &cobra.Command{
@@ -34,10 +35,11 @@ var configGetCmd = &cobra.Command{
 }
 
 var configListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List all configuration values",
-	Args:  cobra.NoArgs,
-	RunE:  runConfigList,
+	Use:     "list",
+	Aliases: []string{"ls", "l"},
+	Short:   "List all configuration values",
+	Args:    cobra.NoArgs,
+	RunE:    runConfigList,
 }
 
 func init() {

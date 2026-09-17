@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -211,7 +212,10 @@ func TestPolicyLoadMissingFileIsDefaultDenyAndSaveUsesSecureAtomicFile(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode()&os.ModeSymlink != 0 || info.Mode().Perm() != 0600 {
+	if info.Mode()&os.ModeSymlink != 0 {
+		t.Fatalf("saved policy is a symlink: %v", info.Mode())
+	}
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0600 {
 		t.Fatalf("saved policy mode = %v, want regular 0600 file", info.Mode())
 	}
 	loaded, err = Load()
@@ -226,6 +230,9 @@ func TestPolicyLoadMissingFileIsDefaultDenyAndSaveUsesSecureAtomicFile(t *testin
 }
 
 func TestPolicyLoadRejectsUnsafeFileAndDoesNotRepairIt(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX mode-bit rejection is covered on Unix; Windows ACL rejection has dedicated tests")
+	}
 	configHome := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", configHome)
 	policyPath, err := Path()

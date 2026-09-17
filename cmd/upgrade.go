@@ -27,10 +27,11 @@ var (
 )
 
 var upgradeCmd = &cobra.Command{
-	Use:   "upgrade [org/repo...]",
-	Short: "Upgrade installed applications",
-	Args:  validateUpgradeArgs,
-	RunE:  runUpgrade,
+	Use:     "upgrade [org/repo...]",
+	Aliases: []string{"up"},
+	Short:   "Upgrade installed applications",
+	Args:    validateUpgradeArgs,
+	RunE:    runUpgrade,
 }
 
 func init() {

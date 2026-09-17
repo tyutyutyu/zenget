@@ -183,7 +183,7 @@ func LoadConfig() (Config, error) {
 		}
 		return Config{}, fmt.Errorf("inspect registry config: %w", err)
 	}
-	if err := validatePrivateFile(info, "registry config"); err != nil {
+	if err := validatePrivateFileAt(configPath, info, "registry config"); err != nil {
 		return Config{}, err
 	}
 	data, err := limits.ReadFile(configPath, limits.DefaultStructuredBytes, "registry config")
@@ -207,8 +207,11 @@ func SaveConfig(config Config) error {
 	if err := os.MkdirAll(directory, 0700); err != nil {
 		return fmt.Errorf("create registry config directory: %w", err)
 	}
+	if err := fileowner.SecurePath(directory, true); err != nil {
+		return fmt.Errorf("secure registry config directory: %w", err)
+	}
 	if info, statErr := os.Lstat(configPath); statErr == nil {
-		if err := validatePrivateFile(info, "registry config"); err != nil {
+		if err := validatePrivateFileAt(configPath, info, "registry config"); err != nil {
 			return err
 		}
 	} else if !os.IsNotExist(statErr) {
@@ -549,7 +552,7 @@ func NewCacheAt(root string) (*Cache, error) {
 		if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
 			return nil, errors.New("registry cache root is not a directory")
 		}
-		if err := os.Chmod(absolute, 0700); err != nil {
+		if err := fileowner.SecurePath(absolute, true); err != nil {
 			return nil, fmt.Errorf("secure registry cache root: %w", err)
 		}
 	} else if !os.IsNotExist(statErr) {
@@ -592,30 +595,36 @@ func (c *Cache) Save(source Source, index Index, recipes map[string][]byte) erro
 		return err
 	}
 	if info, statErr := os.Lstat(namespace); statErr == nil {
-		if err := validatePrivateDirectory(info, "registry cache namespace"); err != nil {
+		if err := validatePrivateDirectoryAt(namespace, info, "registry cache namespace"); err != nil {
 			return err
 		}
 	} else if os.IsNotExist(statErr) {
 		if err := os.Mkdir(namespace, 0700); err != nil {
 			return fmt.Errorf("create registry cache namespace: %w", err)
 		}
+		if err := fileowner.SecurePath(namespace, true); err != nil {
+			return fmt.Errorf("secure registry cache namespace: %w", err)
+		}
 	} else {
 		return fmt.Errorf("inspect registry cache namespace: %w", statErr)
 	}
-	if err := os.Chmod(namespace, 0700); err != nil {
-		return fmt.Errorf("set registry cache namespace permissions: %w", err)
+	if err := fileowner.SecurePath(namespace, true); err != nil {
+		return fmt.Errorf("secure registry cache namespace: %w", err)
 	}
 	if err := os.MkdirAll(namespace, 0700); err != nil {
 		return fmt.Errorf("create registry cache namespace: %w", err)
 	}
 	snapshotsDir := filepath.Join(namespace, "snapshots")
 	if info, statErr := os.Lstat(snapshotsDir); statErr == nil {
-		if err := validatePrivateDirectory(info, "registry snapshot directory"); err != nil {
+		if err := validatePrivateDirectoryAt(snapshotsDir, info, "registry snapshot directory"); err != nil {
 			return err
 		}
 	} else if os.IsNotExist(statErr) {
 		if err := os.Mkdir(snapshotsDir, 0700); err != nil {
 			return fmt.Errorf("create registry snapshot directory: %w", err)
+		}
+		if err := fileowner.SecurePath(snapshotsDir, true); err != nil {
+			return fmt.Errorf("secure registry snapshot directory: %w", err)
 		}
 	} else {
 		return fmt.Errorf("inspect registry snapshot directory: %w", statErr)
@@ -630,6 +639,9 @@ func (c *Cache) Save(source Source, index Index, recipes map[string][]byte) erro
 			_ = os.RemoveAll(staging)
 		}
 	}()
+	if err := fileowner.SecurePath(staging, true); err != nil {
+		return fmt.Errorf("secure registry snapshot staging directory: %w", err)
+	}
 	if err := writeSnapshotFiles(staging, normalizedSource, indexData, indexDigest, index, recipes); err != nil {
 		return err
 	}
@@ -656,6 +668,9 @@ func (c *Cache) Save(source Source, index Index, recipes map[string][]byte) erro
 			return fmt.Errorf("publish registry snapshot: %w", err)
 		}
 		removeStaging = false
+		if err := fileowner.SecurePath(final, true); err != nil {
+			return fmt.Errorf("secure registry snapshot: %w", err)
+		}
 	}
 	pointer := snapshotPointer{SchemaVersion: SchemaVersion, Source: normalizedSource.String(), IndexSHA256: indexDigest}
 	pointerData, err := marshalPointer(pointer)
@@ -686,7 +701,7 @@ func (c *Cache) Load(source Source) (Snapshot, error) {
 		return Snapshot{}, err
 	}
 	if info, statErr := os.Lstat(namespace); statErr == nil {
-		if err := validatePrivateDirectory(info, "registry cache namespace"); err != nil {
+		if err := validatePrivateDirectoryAt(namespace, info, "registry cache namespace"); err != nil {
 			return Snapshot{}, err
 		}
 	} else if os.IsNotExist(statErr) {
@@ -696,7 +711,7 @@ func (c *Cache) Load(source Source) (Snapshot, error) {
 	}
 	snapshotsDirectory := filepath.Join(namespace, "snapshots")
 	if info, statErr := os.Lstat(snapshotsDirectory); statErr == nil {
-		if err := validatePrivateDirectory(info, "registry snapshot directory"); err != nil {
+		if err := validatePrivateDirectoryAt(snapshotsDirectory, info, "registry snapshot directory"); err != nil {
 			return Snapshot{}, err
 		}
 	} else if os.IsNotExist(statErr) {
@@ -712,7 +727,7 @@ func (c *Cache) Load(source Source) (Snapshot, error) {
 		}
 		return Snapshot{}, fmt.Errorf("inspect registry snapshot pointer: %w", err)
 	}
-	if err := validatePrivateFile(info, "registry snapshot pointer"); err != nil {
+	if err := validatePrivateFileAt(pointerPath, info, "registry snapshot pointer"); err != nil {
 		return Snapshot{}, err
 	}
 	pointerData, err := limits.ReadFile(pointerPath, limits.DefaultStructuredBytes, "registry snapshot pointer")
@@ -774,8 +789,8 @@ func writeSnapshotFiles(directory string, source Source, indexData []byte, index
 	if err := os.Mkdir(recipesDirectory, 0700); err != nil {
 		return fmt.Errorf("create registry recipe directory: %w", err)
 	}
-	if err := os.Chmod(recipesDirectory, 0700); err != nil {
-		return fmt.Errorf("set registry recipe directory permissions: %w", err)
+	if err := fileowner.SecurePath(recipesDirectory, true); err != nil {
+		return fmt.Errorf("secure registry recipe directory: %w", err)
 	}
 	for _, entry := range index.Entries {
 		digest := entry.SHA256
@@ -800,7 +815,7 @@ func snapshotDirectoryMatches(directory string, source Source, indexData []byte,
 	if err != nil || info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
 		return false
 	}
-	if err := validatePrivateDirectory(info, "existing registry snapshot"); err != nil {
+	if err := validatePrivateDirectoryAt(directory, info, "existing registry snapshot"); err != nil {
 		return false
 	}
 	rootEntries, err := os.ReadDir(directory)
@@ -831,7 +846,7 @@ func snapshotDirectoryMatches(directory string, source Source, indexData []byte,
 	if err != nil || recipeInfo.Mode()&os.ModeSymlink != 0 || !recipeInfo.IsDir() {
 		return false
 	}
-	if err := validatePrivateDirectory(recipeInfo, "existing registry recipe directory"); err != nil {
+	if err := validatePrivateDirectoryAt(recipesDirectory, recipeInfo, "existing registry recipe directory"); err != nil {
 		return false
 	}
 	entries, err := os.ReadDir(recipesDirectory)
@@ -870,7 +885,7 @@ func loadSnapshotDirectory(directory string, source Source, expectedDigest strin
 	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
 		return Snapshot{}, errors.New("registry snapshot target is not a directory")
 	}
-	if err := validatePrivateDirectory(info, "registry snapshot target"); err != nil {
+	if err := validatePrivateDirectoryAt(directory, info, "registry snapshot target"); err != nil {
 		return Snapshot{}, err
 	}
 	rootEntries, err := os.ReadDir(directory)
@@ -1082,42 +1097,48 @@ func SHA256(data []byte) string {
 
 func ensurePrivateDirectory(directory, kind string) error {
 	if info, err := os.Lstat(directory); err == nil {
-		return validatePrivateDirectory(info, kind)
+		return validatePrivateDirectoryAt(directory, info, kind)
 	} else if os.IsNotExist(err) {
 		if err := os.MkdirAll(directory, 0700); err != nil {
 			return fmt.Errorf("create %s: %w", kind, err)
+		}
+		if err := fileowner.SecurePath(directory, true); err != nil {
+			return fmt.Errorf("secure %s: %w", kind, err)
 		}
 		info, statErr := os.Lstat(directory)
 		if statErr != nil {
 			return fmt.Errorf("inspect %s: %w", kind, statErr)
 		}
-		return validatePrivateDirectory(info, kind)
+		return validatePrivateDirectoryAt(directory, info, kind)
 	} else {
 		return fmt.Errorf("inspect %s: %w", kind, err)
 	}
 }
 
-func validatePrivateDirectory(info os.FileInfo, kind string) error {
+func validatePrivateDirectoryAt(path string, info os.FileInfo, kind string) error {
 	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
 		return fmt.Errorf("%s is not a safe directory", kind)
 	}
-	if info.Mode().Perm()&0022 != 0 || info.Mode()&(os.ModeSetuid|os.ModeSetgid|os.ModeSticky) != 0 {
+	if !fileowner.PrivateDirectoryModeSafe(info) {
 		return fmt.Errorf("%s must not be writable by group or other users", kind)
+	}
+	if !fileowner.CurrentUserOwnsPath(path, info) {
+		return fmt.Errorf("%s is not owned by the current user", kind)
 	}
 	return nil
 }
 
-func validatePrivateFile(info os.FileInfo, kind string) error {
+func validatePrivateFileAt(path string, info os.FileInfo, kind string) error {
 	if info.Mode()&os.ModeSymlink != 0 {
 		return fmt.Errorf("refusing to use %s through symlink", kind)
 	}
 	if !info.Mode().IsRegular() {
 		return fmt.Errorf("%s is not a regular file", kind)
 	}
-	if info.Mode().Perm()&0077 != 0 || info.Mode()&(os.ModeSetuid|os.ModeSetgid|os.ModeSticky) != 0 {
+	if !fileowner.PrivateFileModeSafe(info) {
 		return fmt.Errorf("%s permissions must be no more permissive than 0600", kind)
 	}
-	if !fileowner.CurrentUserOwns(info) {
+	if !fileowner.CurrentUserOwnsPath(path, info) {
 		return fmt.Errorf("%s is not owned by the current user", kind)
 	}
 	return nil
@@ -1131,7 +1152,7 @@ func readPrivateFile(filePath, kind string) ([]byte, error) {
 		}
 		return nil, fmt.Errorf("inspect %s: %w", kind, err)
 	}
-	if err := validatePrivateFile(info, kind); err != nil {
+	if err := validatePrivateFileAt(filePath, info, kind); err != nil {
 		return nil, err
 	}
 	data, err := limits.ReadFile(filePath, limits.DefaultStructuredBytes, kind)
@@ -1155,6 +1176,10 @@ func writeFileSync(filePath string, data []byte, mode os.FileMode, kind string) 
 	if err := file.Chmod(mode); err != nil {
 		_ = file.Close()
 		return fmt.Errorf("set %s permissions: %w", kind, err)
+	}
+	if err := fileowner.SecurePath(filePath, false); err != nil {
+		_ = file.Close()
+		return fmt.Errorf("secure %s: %w", kind, err)
 	}
 	if n, err := file.Write(data); err != nil {
 		_ = file.Close()
@@ -1190,6 +1215,10 @@ func atomicWrite(destination, directory, pattern string, data []byte, mode os.Fi
 		_ = temporary.Close()
 		return fmt.Errorf("set temporary %s permissions: %w", kind, err)
 	}
+	if err := fileowner.SecurePath(temporaryPath, false); err != nil {
+		_ = temporary.Close()
+		return fmt.Errorf("secure temporary %s: %w", kind, err)
+	}
 	if n, err := temporary.Write(data); err != nil {
 		_ = temporary.Close()
 		return fmt.Errorf("write temporary %s: %w", kind, err)
@@ -1205,7 +1234,7 @@ func atomicWrite(destination, directory, pattern string, data []byte, mode os.Fi
 		return fmt.Errorf("close temporary %s: %w", kind, err)
 	}
 	if info, statErr := os.Lstat(destination); statErr == nil {
-		if err := validatePrivateFile(info, kind); err != nil {
+		if err := validatePrivateFileAt(destination, info, kind); err != nil {
 			return err
 		}
 	} else if !os.IsNotExist(statErr) {
@@ -1215,6 +1244,9 @@ func atomicWrite(destination, directory, pattern string, data []byte, mode os.Fi
 		return fmt.Errorf("replace %s: %w", kind, err)
 	}
 	remove = false
+	if err := fileowner.SecurePath(destination, false); err != nil {
+		return fmt.Errorf("secure %s after replacement: %w", kind, err)
+	}
 	return nil
 }
 

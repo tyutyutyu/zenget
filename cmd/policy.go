@@ -41,10 +41,11 @@ var policyRecipeDenyCmd = &cobra.Command{
 }
 
 var policyRecipeListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List allowed remote recipe sources",
-	Args:  cobra.NoArgs,
-	RunE:  runPolicyRecipeList,
+	Use:     "list",
+	Aliases: []string{"ls", "l"},
+	Short:   "List allowed remote recipe sources",
+	Args:    cobra.NoArgs,
+	RunE:    runPolicyRecipeList,
 }
 
 var policyRecipeCheckCmd = &cobra.Command{

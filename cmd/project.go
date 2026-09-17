@@ -20,8 +20,9 @@ import (
 var projectTrustListJSON bool
 
 var projectCmd = &cobra.Command{
-	Use:   "project",
-	Short: "Trust and activate project manifests",
+	Use:     "project",
+	Aliases: []string{"proj"},
+	Short:   "Trust and activate project manifests",
 	Long: `Project manifests are inert until their exact local path is trusted.
 
 Trust a manifest, then activate its managed target shims. Activation performs
@@ -41,11 +42,12 @@ and does not install or execute any artifact.`,
 }
 
 var projectTrustListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List trusted project manifests",
-	Long:  "List the canonical local project manifest paths currently trusted by zenget.",
-	Args:  cobra.NoArgs,
-	RunE:  runProjectTrustList,
+	Use:     "list",
+	Aliases: []string{"ls", "l"},
+	Short:   "List trusted project manifests",
+	Long:    "List the canonical local project manifest paths currently trusted by zenget.",
+	Args:    cobra.NoArgs,
+	RunE:    runProjectTrustList,
 }
 
 var projectUntrustCmd = &cobra.Command{

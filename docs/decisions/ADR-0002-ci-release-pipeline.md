@@ -36,7 +36,7 @@ Dependabot.
 
 | Trigger | Required work |
 | --- | --- |
-| Pull request to `main` | Format, module integrity, lint, tests, coverage, race test, build, vulnerability scan, CodeQL. |
+| Pull request to `main` | Format, module integrity, lint, tests, coverage, race test, build, vulnerability scan, native Windows ownership tests, CodeQL. |
 | Push to `main` | The same checks, so the protected branch remains auditable. |
 | Weekly schedule / manual dispatch | Re-run vulnerability and CodeQL scans against newly published findings. |
 | Version tag | Re-run required checks on the exact tagged commit before release assembly. |
@@ -94,9 +94,13 @@ change the runtime attestation decision recorded in Backlog decision-0001.
    on the merged `main` commit. No release is created from a branch head,
    moving tag, or arbitrary workflow dispatch input.
 2. On tag push, verify strict SemVer syntax, `v` plus the source `Version`
-   constant, tag ancestry on `main`, and a unique tag/commit association.
-   Re-run CI on that exact SHA. The release assembly job checks out that SHA
-   and uses the pinned Go compiler and GoReleaser version.
+   constant, tag ancestry on `main`, and a unique tag/commit association. Run
+   `git verify-tag --raw` and require its GPG fingerprint to match the reviewed
+   `ZENGET_TRUSTED_GPG_FINGERPRINTS` repository variable containing exact full
+   fingerprints; a text `gpgsig` field
+   alone is not evidence. Unknown, malformed, or unsupported signatures fail
+   closed. Re-run CI on that exact SHA. The release assembly job checks out
+   that SHA and uses the pinned Go compiler and GoReleaser version.
 3. Run `goreleaser check` in PR CI and a snapshot build to validate the
    archive configuration. For the tagged build, generate `CGO_ENABLED=0`
    binaries for Linux amd64/arm64, macOS amd64/arm64, and Windows amd64.
@@ -106,8 +110,10 @@ change the runtime attestation decision recorded in Backlog decision-0001.
    every archive; its names must match the assets exactly.
 4. Before publishing, extract each archive and check its single executable,
    platform name, executable bit where relevant, and `zenget --help` on
-   runnable host platforms. Check every archive against `checksums.txt` and
-   verify the tagged source version. Attach a GitHub build-provenance
+   runnable host platforms. The build artifact is checksum-verified and run
+   natively on Linux amd64, macOS arm64, and Windows amd64 before attestation;
+   no smoke job rebuilds or downloads a public release. Check every archive
+   against `checksums.txt` and verify the tagged source version. Attach a GitHub build-provenance
    attestation to each final archive and the checksum file, with the
    `id-token: write` and `attestations: write` rights scoped to this job.
    Optionally attach an SPDX SBOM after its format and maintenance cost are
@@ -167,9 +173,12 @@ Enabling branch/tag protection and publishing a draft are repository settings
 and release actions, respectively, to perform only after the configuration
 is reviewable.
 
-The extra scans and race test increase CI time, and a public-release smoke
-test depends on GitHub availability. Failed network scans should surface as
-failures with a manual rerun path, not disappear behind `continue-on-error`.
+The weekly `Weekly security scan` workflow runs the pinned vulnerability check
+on the default branch every Monday and through manual dispatch. Scanner or
+database errors fail the job. The extra scans and race test increase CI time,
+and a public-release smoke test depends on GitHub availability. Failed network
+scans should surface as failures with a manual rerun path, not disappear behind
+`continue-on-error`.
 Attestations prove the build identity and artifact digest, not the absence
 of vulnerabilities; the static checks and release review remain separate.
 

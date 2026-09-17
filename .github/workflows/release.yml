@@ -19,6 +19,8 @@ jobs:
   validate:
     name: Validate release tag
     runs-on: ubuntu-24.04
+    env:
+      ZENGET_TRUSTED_GPG_FINGERPRINTS: ${{ vars.ZENGET_TRUSTED_GPG_FINGERPRINTS }}
     outputs:
       tag: ${{ steps.release.outputs.tag }}
     steps:
@@ -115,9 +117,95 @@ jobs:
       - name: Verify checksums, archive contents, and Linux help
         run: scripts/verify-release-artifacts.sh dist --run-help
 
+  smoke-linux:
+    name: Linux amd64 release smoke
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Download release output
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: zenget-release-${{ github.sha }}
+          path: dist
+
+      - name: Verify and run Linux amd64 archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="zenget_${GITHUB_REF_NAME#v}_linux_amd64.tar.gz"
+          expected="$(awk -v asset="$archive" '$2 == asset || $2 == "*" asset { print tolower($1); exit }' dist/checksums.txt)"
+          actual="$(sha256sum "dist/$archive" | awk '{print tolower($1)}')"
+          [[ -n "$expected" && "$expected" == "$actual" ]]
+          extract="$(mktemp -d)"
+          trap 'rm -rf "$extract"' EXIT
+          tar -xzf "dist/$archive" -C "$extract"
+          "$extract/zenget" --help >/dev/null
+
+  smoke-macos:
+    name: macOS arm64 release smoke
+    needs: build
+    runs-on: macos-14
+    permissions:
+      contents: read
+    steps:
+      - name: Download release output
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: zenget-release-${{ github.sha }}
+          path: dist
+
+      - name: Verify and run macOS arm64 archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="zenget_${GITHUB_REF_NAME#v}_darwin_arm64.tar.gz"
+          expected="$(awk -v asset="$archive" '$2 == asset || $2 == "*" asset { print tolower($1); exit }' dist/checksums.txt)"
+          actual="$(shasum -a 256 "dist/$archive" | awk '{print tolower($1)}')"
+          [[ -n "$expected" && "$expected" == "$actual" ]]
+          extract="$(mktemp -d)"
+          trap 'rm -rf "$extract"' EXIT
+          tar -xzf "dist/$archive" -C "$extract"
+          "$extract/zenget" --help >/dev/null
+
+  smoke-windows:
+    name: Windows amd64 release smoke
+    needs: build
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Download release output
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: zenget-release-${{ github.sha }}
+          path: dist
+
+      - name: Verify and run Windows amd64 archive
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $archive = "zenget_$($env:GITHUB_REF_NAME -replace '^v', '')_windows_amd64.zip"
+          $line = Get-Content "dist/checksums.txt" | Where-Object { $_ -match "\s$([regex]::Escape($archive))$" } | Select-Object -First 1
+          if (-not $line) { throw "checksums.txt does not contain $archive" }
+          $expected = ($line -split "\s+")[0].ToLowerInvariant()
+          $actual = (Get-FileHash "dist/$archive" -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($expected -ne $actual) { throw "SHA-256 mismatch for $archive" }
+          $extract = Join-Path $env:RUNNER_TEMP "zenget-release-smoke"
+          Expand-Archive -LiteralPath "dist/$archive" -DestinationPath $extract -Force
+          $binary = Join-Path $extract "zenget.exe"
+          if (-not (Test-Path -LiteralPath $binary)) { throw "archive does not contain zenget.exe at its root" }
+          & $binary --help | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "zenget.exe --help failed with exit code $LASTEXITCODE" }
+
   attest:
     name: Attest verified artifacts
-    needs: verify
+    needs:
+      - verify
+      - smoke-linux
+      - smoke-macos
+      - smoke-windows
     runs-on: ubuntu-24.04
     permissions:
       actions: read
@@ -144,6 +232,9 @@ jobs:
     needs:
       - validate
       - verify
+      - smoke-linux
+      - smoke-macos
+      - smoke-windows
       - attest
     runs-on: ubuntu-24.04
     permissions:
