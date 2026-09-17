@@ -31,6 +31,23 @@ if [[ -z "$trusted_signers" ]]; then
   exit 1
 fi
 
+trusted_public_keys="${ZENGET_TRUSTED_GPG_PUBLIC_KEYS:-}"
+if [[ -z "$trusted_public_keys" || "$trusted_public_keys" == *"PRIVATE KEY"* ]]; then
+  echo "ZENGET_TRUSTED_GPG_PUBLIC_KEYS must contain the reviewed public GPG key(s)" >&2
+  exit 1
+fi
+
+# Fresh runners have no maintainer keyring. Use only explicitly supplied public
+# keys, without relying on ambient keys or a network keyserver.
+verification_home="$(mktemp -d)"
+trap 'rm -rf "$verification_home"' EXIT
+chmod 700 "$verification_home"
+export GNUPGHOME="$verification_home"
+if ! printf '%s\n' "$trusted_public_keys" | gpg --batch --no-options --import >/dev/null 2>&1; then
+  echo "could not import the reviewed public GPG key(s)" >&2
+  exit 1
+fi
+
 verification_output=""
 if ! verification_output="$(git verify-tag --raw "$tag" 2>&1)"; then
   printf 'cryptographic tag signature verification failed for %s:\n%s\n' "$tag" "$verification_output" >&2

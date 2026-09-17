@@ -20,7 +20,13 @@ release builds use Go 1.26.8 with `GOTOOLCHAIN=local`.
    ```
 
    Set the repository variable `ZENGET_TRUSTED_GPG_FINGERPRINTS` to the
-   reviewed maintainer full GPG fingerprint(s) before pushing the tag. The release
+   reviewed maintainer full GPG fingerprint(s) before pushing the tag. Set
+   `ZENGET_TRUSTED_GPG_PUBLIC_KEYS` to the corresponding armored public keys
+   exported with `gpg --armor --export FULL_FINGERPRINT`. Review both variables
+   together during initial setup and rotation; never export a private key.
+   The verifier imports these public keys into a temporary isolated keyring,
+   so fresh runners need neither preinstalled keys nor a network keyserver.
+   Missing or invalid public-key input fails closed. The release
    workflow runs `git verify-tag --raw` and accepts only a cryptographically
    valid annotated GPG tag whose signer matches that variable. Missing,
    malformed, SSH/X.509, or unknown signatures fail closed; no private key is
@@ -81,8 +87,10 @@ immutable: corrections require a new patch version.
 ## Post-publication smoke
 
 After publishing, manually run the `Public release smoke` workflow with the
-published tag. It downloads the public checksum manifest and every archive,
-checks all five hashes and archive layouts, runs Linux amd64 and macOS arm64
+published tag. It downloads the public checksum manifest and every archive
+using HTTPS-only transfers and HTTPS-only redirects; those transport
+restrictions work together with checksum verification. It checks all five
+hashes and archive layouts, runs Linux amd64 and macOS arm64
 help smoke, and exercises Windows amd64 extraction/help. Supplying
 `previous_tag` additionally downloads the older Linux/macOS release and runs
 `zenget self-upgrade` in an isolated config directory. If no previous release

@@ -21,6 +21,7 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       ZENGET_TRUSTED_GPG_FINGERPRINTS: ${{ vars.ZENGET_TRUSTED_GPG_FINGERPRINTS }}
+      ZENGET_TRUSTED_GPG_PUBLIC_KEYS: ${{ vars.ZENGET_TRUSTED_GPG_PUBLIC_KEYS }}
     outputs:
       tag: ${{ steps.release.outputs.tag }}
     steps:

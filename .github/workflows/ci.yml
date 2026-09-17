@@ -144,6 +144,13 @@ jobs:
           go-version: 1.26.8
           cache: true
 
+      - name: Test release tag and public smoke failure handling
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/verify-release-tag_test.sh
+          bash scripts/release-smoke_test.sh
+
       - name: Check GoReleaser configuration
         uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
         with:

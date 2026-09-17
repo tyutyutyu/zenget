@@ -19,10 +19,11 @@ if [[ "$archive_os" == "windows" ]]; then
 fi
 
 sha256_file() {
+  local file_path="$1"
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum "$1" | awk '{print tolower($1)}'
+    sha256sum "$file_path" | awk '{print tolower($1)}'
   else
-    shasum -a 256 "$1" | awk '{print tolower($1)}'
+    shasum -a 256 "$file_path" | awk '{print tolower($1)}'
   fi
 }
 
@@ -33,14 +34,20 @@ download_release() {
   local archive="zenget_${release_version}_${archive_os}_${archive_arch}.tar.gz"
   local base="https://github.com/${repository}/releases/download/${release_tag}"
   mkdir -p "$output_dir"
-  curl --fail --location --retry 3 "$base/checksums.txt" --output "$output_dir/checksums.txt"
-  curl --fail --location --retry 3 "$base/$archive" --output "$output_dir/$archive"
+  if ! curl --fail --location --retry 3 --proto '=https' --proto-redir '=https' "$base/checksums.txt" --output "$output_dir/checksums.txt"; then
+    echo "failed to download public release checksums for $release_tag" >&2
+    return 1
+  fi
+  if ! curl --fail --location --retry 3 --proto '=https' --proto-redir '=https' "$base/$archive" --output "$output_dir/$archive"; then
+    echo "failed to download public release archive $archive" >&2
+    return 1
+  fi
   local expected actual
   expected="$(awk -v asset="$archive" '$2 == asset { print tolower($1); exit }' "$output_dir/checksums.txt")"
   actual="$(sha256_file "$output_dir/$archive")"
   if [[ -z "$expected" || "$expected" != "$actual" ]]; then
     echo "SHA-256 mismatch for public release asset $archive" >&2
-    exit 1
+    return 1
   fi
   tar -xzf "$output_dir/$archive" -C "$output_dir"
   chmod +x "$output_dir/zenget"
