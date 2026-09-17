@@ -20,6 +20,45 @@ Install the latest release of a GitHub repository:
 zenget install org/repo
 ```
 
+### Short command aliases
+
+zenget supports only the following explicit, lowercase aliases. Full command
+names remain available, and aliases preserve the same arguments, flags,
+validation, output, and exit status as their full commands.
+
+| Command | Aliases |
+| --- | --- |
+| `install` | `i` |
+| `uninstall` | `rm`, `un` |
+| `upgrade` | `up` |
+| `list` | `ls`, `l` |
+| `config` | `cfg` |
+| `registry` | `reg` |
+| `project` | `proj` |
+| `config list` | `ls`, `l` |
+| `registry list` | `ls`, `l` |
+| `cache list` | `ls`, `l` |
+| `policy recipe list` | `ls`, `l` |
+| `project trust list` | `ls`, `l` |
+| `registry remove` | `rm` |
+
+For example:
+
+```sh
+zenget i org/repo --tag v1.2.3
+zenget rm org/repo
+zenget up --dry-run
+zenget ls --json
+zenget cfg get checksum_policy
+zenget reg ls --json
+zenget proj trust ls --json
+zenget reg rm local
+```
+
+Aliases are exact and case-sensitive: names such as `inst`, `u`, `c`, `r`,
+`p`, and `I` are not aliases. The existing `list -u` option remains the
+short form of `--updates`.
+
 If a release has multiple assets, zenget tries to pick the one matching your
 platform and prefers `.tar.gz`/`.tgz` over `.zip` over a raw binary. You can
 override the selection explicitly with `--asset`:

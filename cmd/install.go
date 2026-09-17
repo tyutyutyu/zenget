@@ -32,11 +32,12 @@ import (
 var repoPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`)
 
 var installCmd = &cobra.Command{
-	Use:   "install <org/repo>",
-	Short: "Install the latest release of a GitHub repository",
-	Long:  "Install a release using normal provider resolution, an explicit local --recipe, or exactly one synchronized --registry snapshot. A plain install consults synchronized registry snapshots automatically unless --no-registry is given and silently falls back to heuristic resolution on a registry miss. --recipe and --registry are mutually exclusive; --offline permits only a policy-authorized registry snapshot and verified local artifact cache.",
-	Args:  cobra.ExactArgs(1),
-	RunE:  runInstall,
+	Use:     "install <org/repo>",
+	Aliases: []string{"i"},
+	Short:   "Install the latest release of a GitHub repository",
+	Long:    "Install a release using normal provider resolution, an explicit local --recipe, or exactly one synchronized --registry snapshot. A plain install consults synchronized registry snapshots automatically unless --no-registry is given and silently falls back to heuristic resolution on a registry miss. --recipe and --registry are mutually exclusive; --offline permits only a policy-authorized registry snapshot and verified local artifact cache.",
+	Args:    cobra.ExactArgs(1),
+	RunE:    runInstall,
 }
 
 func init() {
