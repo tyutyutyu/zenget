@@ -916,3 +916,5 @@ A successful upload `POST`s JSON with this shape:
 ```
 
 The collector deduplicates by `send_id`. Success is HTTP 2xx; any other status, timeout, or network error is treated as a failure and retried later.
+
+<!-- Temporary fork CI/CodeQL permission probe; do not merge. -->
