@@ -125,6 +125,10 @@ for archive in "${archives[@]}"; do
         exit 1
       fi
       ;;
+    *)
+      echo "unsupported archive type: $name" >&2
+      exit 1
+      ;;
   esac
 done
 

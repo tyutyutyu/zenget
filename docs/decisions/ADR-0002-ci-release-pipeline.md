@@ -97,7 +97,10 @@ change the runtime attestation decision recorded in Backlog decision-0001.
    constant, tag ancestry on `main`, and a unique tag/commit association. Run
    `git verify-tag --raw` and require its GPG fingerprint to match the reviewed
    `ZENGET_TRUSTED_GPG_FINGERPRINTS` repository variable containing exact full
-   fingerprints; a text `gpgsig` field
+   fingerprints. Import the reviewed armored public keys from
+   `ZENGET_TRUSTED_GPG_PUBLIC_KEYS` into an isolated temporary keyring; missing
+   or invalid key input fails closed, and no network keyserver is required.
+   Rotate both public trust variables together; a text `gpgsig` field
    alone is not evidence. Unknown, malformed, or unsupported signatures fail
    closed. Re-run CI on that exact SHA. The release assembly job checks out
    that SHA and uses the pinned Go compiler and GoReleaser version.

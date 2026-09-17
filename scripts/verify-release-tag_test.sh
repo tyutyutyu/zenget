@@ -48,6 +48,8 @@ if [[ -z "$trusted_fingerprint" ]]; then
 fi
 git -C "$work" config user.signingkey "$trusted_fingerprint"
 export ZENGET_TRUSTED_GPG_FINGERPRINTS="$trusted_fingerprint"
+trusted_public_keys="$(gpg --batch --armor --export "$trusted_fingerprint")"
+export ZENGET_TRUSTED_GPG_PUBLIC_KEYS="$trusted_public_keys"
 
 expect_success() {
   local label="$1"
@@ -74,6 +76,16 @@ expect_failure() {
 git -C "$work" tag -s -a v0.0.1 -m "zenget v0.0.1" HEAD
 git -C "$work" push origin v0.0.1 >/dev/null
 expect_success "trusted signed annotated tag" v0.0.1 "$main_commit"
+
+export ZENGET_TRUSTED_GPG_PUBLIC_KEYS=""
+expect_failure "missing public key despite populated ambient keyring" v0.0.1 "$main_commit"
+export ZENGET_TRUSTED_GPG_PUBLIC_KEYS="invalid public key"
+expect_failure "malformed public key" v0.0.1 "$main_commit"
+export ZENGET_TRUSTED_GPG_PUBLIC_KEYS="-----BEGIN PGP PRIVATE KEY BLOCK-----"
+expect_failure "private key input" v0.0.1 "$main_commit"
+export ZENGET_TRUSTED_GPG_PUBLIC_KEYS="$trusted_public_keys"
+mkdir -m 700 "$tmpdir/empty-keyring"
+GNUPGHOME="$tmpdir/empty-keyring" expect_success "fresh runner without ambient keys" v0.0.1 "$main_commit"
 
 export ZENGET_TRUSTED_GPG_FINGERPRINTS="${trusted_fingerprint: -16}"
 expect_failure "short key id is not a full trusted fingerprint" v0.0.1 "$main_commit"
@@ -105,6 +117,7 @@ Expire-Date: 0
 KEY
 gpg --batch --generate-key "$tmpdir/foreign.batch" >/dev/null 2>&1
 foreign_fingerprint="$(gpg --batch --with-colons --list-secret-keys foreign@example.invalid | awk -F: '$1 == "fpr" { print toupper($10); exit }')"
+export ZENGET_TRUSTED_GPG_PUBLIC_KEYS="$(gpg --batch --armor --export "$trusted_fingerprint" "$foreign_fingerprint")"
 git -C "$work" config user.signingkey "$foreign_fingerprint"
 git -C "$work" tag -s -a v0.0.6 -m "foreign signature" HEAD
 expect_failure "untrusted signer" v0.0.6 "$main_commit"

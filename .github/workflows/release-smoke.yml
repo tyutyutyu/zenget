@@ -34,13 +34,13 @@ jobs:
           set -euo pipefail
           base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}"
           mkdir -p dist
-          curl --fail --location --retry 3 "$base/checksums.txt" --output dist/checksums.txt
+          curl --fail --location --retry 3 --proto '=https' --proto-redir '=https' "$base/checksums.txt" --output dist/checksums.txt
           while IFS= read -r asset; do
             case "$asset" in
               zenget_*.tar.gz|zenget_*.zip) ;;
               *) echo "Unexpected release asset in checksums.txt: $asset" >&2; exit 1 ;;
             esac
-            curl --fail --location --retry 3 "$base/$asset" --output "dist/$asset"
+            curl --fail --location --retry 3 --proto '=https' --proto-redir '=https' "$base/$asset" --output "dist/$asset"
           done < <(awk 'NF == 2 { gsub(/^\*/, "", $2); print $2 }' dist/checksums.txt)
 
       - name: Verify checksums, archive contents, and Linux help
