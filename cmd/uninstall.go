@@ -15,10 +15,11 @@ import (
 )
 
 var uninstallCmd = &cobra.Command{
-	Use:   "uninstall <name|org/repo>",
-	Short: "Remove an installed binary and its registry entry",
-	Args:  cobra.ExactArgs(1),
-	RunE:  runUninstall,
+	Use:     "uninstall <name|org/repo>",
+	Aliases: []string{"rm", "un"},
+	Short:   "Remove an installed binary and its registry entry",
+	Args:    cobra.ExactArgs(1),
+	RunE:    runUninstall,
 }
 
 func init() {
@@ -233,20 +234,4 @@ func preflightWrapper(wrapperPath string) (bool, error) {
 		return false, fmt.Errorf("not removing foreign file %q", wrapperPath)
 	}
 	return true, nil
-}
-
-// removeWrapper deletes a wrapper only when it is zenget-managed. Foreign
-// files are left untouched and returned as an error.
-func removeWrapper(wrapperPath string) error {
-	exists, err := preflightWrapper(wrapperPath)
-	if err != nil {
-		return err
-	}
-	if !exists {
-		return nil
-	}
-	if err := os.Remove(wrapperPath); err != nil {
-		return fmt.Errorf("remove wrapper %q: %w", wrapperPath, err)
-	}
-	return nil
 }

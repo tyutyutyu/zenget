@@ -27,10 +27,11 @@ var (
 )
 
 var upgradeCmd = &cobra.Command{
-	Use:   "upgrade [org/repo...]",
-	Short: "Upgrade installed applications",
-	Args:  validateUpgradeArgs,
-	RunE:  runUpgrade,
+	Use:     "upgrade [org/repo...]",
+	Aliases: []string{"up"},
+	Short:   "Upgrade installed applications",
+	Args:    validateUpgradeArgs,
+	RunE:    runUpgrade,
 }
 
 func init() {
@@ -340,10 +341,6 @@ func buildUpgradePlan(ctx context.Context, client *github.Client, st *state.Stat
 	}
 
 	return plan
-}
-
-func lookupUpgradeReleases(ctx context.Context, client *github.Client, repositories []string) map[string]upgradeLookup {
-	return lookupUpgradeReleasesWithFilters(ctx, client, repositories, nil)
 }
 
 func lookupUpgradeReleasesWithState(ctx context.Context, client *github.Client, repositories []string, st *state.State) map[string]upgradeLookup {

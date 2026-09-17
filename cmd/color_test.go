@@ -75,7 +75,7 @@ func TestColorEnabledNeverColorsRegularFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create temp file: %v", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	if colorEnabled(colorModeAuto, f) {
 		t.Error("colorEnabled(auto, regular file) = true, want false")
 	}

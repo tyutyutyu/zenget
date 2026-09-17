@@ -92,7 +92,8 @@ func TestResolveReleaseWithFilterPreservesExactTagPriorityAndFiltersFallback(t *
 		byTag:    exact,
 		byTagErr: errors.New("unexpected 500 response"),
 	}
-	release, err := resolveReleaseWithFilter(context.Background(), providerClient, "acme", "tool", "7.0", "cli-*")
+	var release *provider.Release
+	_, err := resolveReleaseWithFilter(context.Background(), providerClient, "acme", "tool", "7.0", "cli-*")
 	if err == nil || !strings.Contains(err.Error(), "unexpected 500") {
 		t.Fatalf("non-404 exact lookup error = %v, want provider error", err)
 	}

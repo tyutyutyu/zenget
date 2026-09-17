@@ -20,9 +20,10 @@ var (
 )
 
 var registryCmd = &cobra.Command{
-	Use:   "registry",
-	Short: "Manage commit-pinned remote recipe registries",
-	Long:  "Manage named, commit-pinned GitHub recipe registries. A source must use github:owner/repository@<40-hex-commit>:<relative-root>; add and remove change only local configuration, while sync fetches a policy-authorized immutable snapshot.",
+	Use:     "registry",
+	Aliases: []string{"reg"},
+	Short:   "Manage commit-pinned remote recipe registries",
+	Long:    "Manage named, commit-pinned GitHub recipe registries. A source must use github:owner/repository@<40-hex-commit>:<relative-root>; add and remove change only local configuration, while sync fetches a policy-authorized immutable snapshot.",
 }
 
 var registryAddCmd = &cobra.Command{
@@ -33,17 +34,19 @@ var registryAddCmd = &cobra.Command{
 }
 
 var registryRemoveCmd = &cobra.Command{
-	Use:   "remove <name>",
-	Short: "Remove one named recipe registry",
-	Args:  cobra.ExactArgs(1),
-	RunE:  runRegistryRemove,
+	Use:     "remove <name>",
+	Aliases: []string{"rm"},
+	Short:   "Remove one named recipe registry",
+	Args:    cobra.ExactArgs(1),
+	RunE:    runRegistryRemove,
 }
 
 var registryListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List configured recipe registries",
-	Args:  cobra.NoArgs,
-	RunE:  runRegistryList,
+	Use:     "list",
+	Aliases: []string{"ls", "l"},
+	Short:   "List configured recipe registries",
+	Args:    cobra.NoArgs,
+	RunE:    runRegistryList,
 }
 
 var registrySyncCmd = &cobra.Command{

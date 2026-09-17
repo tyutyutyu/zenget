@@ -348,7 +348,7 @@ func ReadFile(path string, max int64, kind string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	return ReadAll(file, max, kind, path)
 }
 
@@ -471,7 +471,7 @@ func DecodeJSONFile(path string, destination any, max int64, kind string) error 
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	return DecodeJSON(file, destination, max, kind, path)
 }
 

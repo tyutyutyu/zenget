@@ -32,10 +32,11 @@ var cacheCmd = &cobra.Command{
 }
 
 var cacheListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List cached extracted artifacts",
-	Args:  cobra.NoArgs,
-	RunE:  runCacheList,
+	Use:     "list",
+	Aliases: []string{"ls", "l"},
+	Short:   "List cached extracted artifacts",
+	Args:    cobra.NoArgs,
+	RunE:    runCacheList,
 }
 
 var cacheGCCmd = &cobra.Command{

@@ -51,7 +51,7 @@ func Record(path, repository, version string, start time.Time, duration time.Dur
 	if err != nil {
 		return fmt.Errorf("open usage log %q: %w", path, err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	if _, err := file.Write(append(data, '\n')); err != nil {
 		return fmt.Errorf("write usage log %q: %w", path, err)
 	}
@@ -84,7 +84,7 @@ func ReadLog(path string) ([]Event, error) {
 		}
 		return nil, fmt.Errorf("open usage log %q: %w", path, err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	var events []Event
 	scanner := bufio.NewScanner(file)
