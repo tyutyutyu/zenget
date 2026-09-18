@@ -127,6 +127,8 @@ previous_output="$(run_platform_smoke v1.0.0 v0.9.0 linux amd64)"
 assert_contains "self-upgrade smoke passed" "$previous_output"
 [[ "$(wc -l <"$curl_log")" -eq 4 ]] || fail "previous-tag smoke did not make four HTTPS downloads"
 assert_contains "self-upgrade" "$(cat "$exec_log")"
+assert_contains "v1.0.0 --help" "$(cat "$exec_log")"
+assert_contains "v0.9.0 self-upgrade" "$(cat "$exec_log")"
 
 for failed_asset in checksums.txt zenget_1.0.0_linux_amd64.tar.gz; do
   : >"$curl_log"
@@ -160,6 +162,7 @@ for command in awk bash chmod cp dirname env grep gzip mkdir mktemp rm tar; do
 done
 cat >"$fallback/shasum" <<EOF
 #!/usr/bin/env bash
+[[ "\$1" == '-a' && "\$2" == '256' ]] || exit 64
 shift 2
 exec "$(command -v sha256sum)" "\$@"
 EOF
