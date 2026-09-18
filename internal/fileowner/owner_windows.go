@@ -29,6 +29,22 @@ const (
 // Administrators. A missing/NULL DACL, reparse point, or metadata error fails
 // closed.
 func CurrentUserOwnsPath(path string, info os.FileInfo) bool {
+	if !pathMetadataSafe(path, info) {
+		return false
+	}
+	owner := currentUserSID()
+	if owner == nil {
+		return false
+	}
+	descriptor, err := windows.GetNamedSecurityInfo(path, windows.SE_FILE_OBJECT,
+		windows.OWNER_SECURITY_INFORMATION|windows.DACL_SECURITY_INFORMATION)
+	if err != nil || descriptor == nil {
+		return false
+	}
+	return ownerMatchesAndDACLIsSafe(descriptor, owner)
+}
+
+func pathMetadataSafe(path string, info os.FileInfo) bool {
 	if info == nil || info.Mode()&os.ModeSymlink != 0 {
 		return false
 	}
@@ -37,52 +53,58 @@ func CurrentUserOwnsPath(path string, info os.FileInfo) bool {
 		return false
 	}
 	attributes, err := windows.GetFileAttributes(name)
-	if err != nil || attributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0 {
-		return false
-	}
+	return err == nil && attributes&windows.FILE_ATTRIBUTE_REPARSE_POINT == 0
+}
 
+func currentUserSID() *windows.SID {
 	token := windows.GetCurrentProcessToken()
 	tokenUser, err := token.GetTokenUser()
 	if err != nil || tokenUser == nil || tokenUser.User.Sid == nil {
-		return false
+		return nil
 	}
-	descriptor, err := windows.GetNamedSecurityInfo(path, windows.SE_FILE_OBJECT,
-		windows.OWNER_SECURITY_INFORMATION|windows.DACL_SECURITY_INFORMATION)
-	if err != nil || descriptor == nil {
-		return false
-	}
+	return tokenUser.User.Sid
+}
+
+func ownerMatchesAndDACLIsSafe(descriptor *windows.SECURITY_DESCRIPTOR, currentUser *windows.SID) bool {
 	owner, _, err := descriptor.Owner()
-	if err != nil || owner == nil || !owner.Equals(tokenUser.User.Sid) {
+	if err != nil || owner == nil || currentUser == nil || !owner.Equals(currentUser) {
 		return false
 	}
 	dacl, _, err := descriptor.DACL()
 	if err != nil || dacl == nil {
 		return false
 	}
+	return daclAllowsOnlyTrustedWriters(dacl, owner)
+}
+
+func daclAllowsOnlyTrustedWriters(dacl *windows.ACL, owner *windows.SID) bool {
 	for index := uint16(0); index < dacl.AceCount; index++ {
-		var ace *windows.ACCESS_ALLOWED_ACE
-		if err := windows.GetAce(dacl, uint32(index), &ace); err != nil || ace == nil {
-			return false
-		}
-		if ace.Header.AceType == windows.ACCESS_DENIED_ACE_TYPE {
-			continue
-		}
-		// The x/sys/windows API exposes the common ACE layout. Reject every
-		// other ACE type rather than guessing at object/callback ACE layouts;
-		// an unrecognised allow ACE could grant a write right to an untrusted
-		// SID.
-		if ace.Header.AceType != windows.ACCESS_ALLOWED_ACE_TYPE {
-			return false
-		}
-		if windows.ACCESS_MASK(ace.Mask)&unsafeWriteRights == 0 {
-			continue
-		}
-		aceSID := (*windows.SID)(unsafe.Pointer(&ace.SidStart))
-		if !trustedWritePrincipal(aceSID, owner) {
+		if !aceAllowsOnlyTrustedWriter(dacl, index, owner) {
 			return false
 		}
 	}
 	return true
+}
+
+func aceAllowsOnlyTrustedWriter(dacl *windows.ACL, index uint16, owner *windows.SID) bool {
+	var ace *windows.ACCESS_ALLOWED_ACE
+	if err := windows.GetAce(dacl, uint32(index), &ace); err != nil || ace == nil {
+		return false
+	}
+	if ace.Header.AceType == windows.ACCESS_DENIED_ACE_TYPE {
+		return true
+	}
+	// The x/sys/windows API exposes the common ACE layout. Reject every other
+	// ACE type rather than guessing at object/callback ACE layouts; an
+	// unrecognised allow ACE could grant a write right to an untrusted SID.
+	if ace.Header.AceType != windows.ACCESS_ALLOWED_ACE_TYPE {
+		return false
+	}
+	if windows.ACCESS_MASK(ace.Mask)&unsafeWriteRights == 0 {
+		return true
+	}
+	aceSID := (*windows.SID)(unsafe.Pointer(&ace.SidStart))
+	return trustedWritePrincipal(aceSID, owner)
 }
 
 func trustedWritePrincipal(sid, owner *windows.SID) bool {

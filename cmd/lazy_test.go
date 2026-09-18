@@ -229,58 +229,63 @@ func TestLazyInstallRejectsInvalidProjectState(t *testing.T) {
 		t.Fatalf("non-project selection error = %v", err)
 	}
 
-	t.Run("manifest reload failure", func(t *testing.T) {
-		manifestPath, _ := configureLazyProject(t, []byte("#!/bin/sh\nexit 0\n"))
-		selection, err := ResolveTarget("tool", TargetResolveOptions{})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Remove(manifestPath); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := lazyInstallProjectTarget(nil, selection); err == nil || !strings.Contains(err.Error(), "reload project manifest") { //nolint:staticcheck // this test covers nil-context normalization
-			t.Fatalf("reload error = %v", err)
-		}
-	})
+	t.Run("manifest reload failure", testLazyInstallManifestReloadFailure)
+	t.Run("manifest path changed", testLazyInstallManifestPathChanged)
+	t.Run("target missing", testLazyInstallTargetMissing)
+	t.Run("ambiguous target", testLazyInstallAmbiguousTarget)
+}
 
-	t.Run("manifest path changed", func(t *testing.T) {
-		manifestPath, _ := configureLazyProject(t, []byte("#!/bin/sh\nexit 0\n"))
-		selection, err := ResolveTarget("tool", TargetResolveOptions{})
-		if err != nil {
-			t.Fatal(err)
-		}
-		selection.ManifestPath = filepath.Dir(manifestPath) + string(os.PathSeparator) + "." + string(os.PathSeparator) + "zenget.json"
-		if _, err := lazyInstallProjectTarget(context.Background(), selection); err == nil || !strings.Contains(err.Error(), "path changed") {
-			t.Fatalf("changed-path error = %v", err)
-		}
-	})
+func testLazyInstallManifestReloadFailure(t *testing.T) {
+	manifestPath, _ := configureLazyProject(t, []byte("#!/bin/sh\nexit 0\n"))
+	selection, err := ResolveTarget("tool", TargetResolveOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(manifestPath); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := lazyInstallProjectTarget(nil, selection); err == nil || !strings.Contains(err.Error(), "reload project manifest") { //nolint:staticcheck // this test covers nil-context normalization
+		t.Fatalf("reload error = %v", err)
+	}
+}
 
-	t.Run("target missing", func(t *testing.T) {
-		manifestPath, _ := configureLazyProject(t, []byte("#!/bin/sh\nexit 0\n"))
-		writeCommandManifest(t, manifestPath, state.Manifest{
-			SchemaVersion: manifest.SchemaVersion,
-			Apps:          []state.ManifestApp{{Repository: "acme/other", Provider: manifest.ProviderGitHub, Tag: "v1.0.0", Asset: "tool"}},
-		})
-		selection := TargetSelection{Source: selectionProject, ManifestPath: manifestPath, Target: "tool"}
-		if _, err := lazyInstallProjectTarget(context.Background(), selection); err == nil || !strings.Contains(err.Error(), "not present") {
-			t.Fatalf("missing target error = %v", err)
-		}
-	})
+func testLazyInstallManifestPathChanged(t *testing.T) {
+	manifestPath, _ := configureLazyProject(t, []byte("#!/bin/sh\nexit 0\n"))
+	selection, err := ResolveTarget("tool", TargetResolveOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	selection.ManifestPath = filepath.Dir(manifestPath) + string(os.PathSeparator) + "." + string(os.PathSeparator) + "zenget.json"
+	if _, err := lazyInstallProjectTarget(context.Background(), selection); err == nil || !strings.Contains(err.Error(), "path changed") {
+		t.Fatalf("changed-path error = %v", err)
+	}
+}
 
-	t.Run("ambiguous target", func(t *testing.T) {
-		manifestPath, _ := configureLazyProject(t, []byte("#!/bin/sh\nexit 0\n"))
-		writeCommandManifest(t, manifestPath, state.Manifest{
-			SchemaVersion: manifest.SchemaVersion,
-			Apps: []state.ManifestApp{
-				{Repository: "acme/one", Provider: manifest.ProviderGitHub, Tag: "v1.0.0", Asset: "tool", TargetName: "tool"},
-				{Repository: "acme/two", Provider: manifest.ProviderGitHub, Tag: "v1.0.0", Asset: "tool", TargetName: "tool"},
-			},
-		})
-		selection := TargetSelection{Source: selectionProject, ManifestPath: manifestPath, Target: "tool"}
-		if _, err := lazyInstallProjectTarget(context.Background(), selection); err == nil || !strings.Contains(err.Error(), "matches multiple") {
-			t.Fatalf("ambiguous target error = %v", err)
-		}
+func testLazyInstallTargetMissing(t *testing.T) {
+	manifestPath, _ := configureLazyProject(t, []byte("#!/bin/sh\nexit 0\n"))
+	writeCommandManifest(t, manifestPath, state.Manifest{
+		SchemaVersion: manifest.SchemaVersion,
+		Apps:          []state.ManifestApp{{Repository: "acme/other", Provider: manifest.ProviderGitHub, Tag: "v1.0.0", Asset: "tool"}},
 	})
+	selection := TargetSelection{Source: selectionProject, ManifestPath: manifestPath, Target: "tool"}
+	if _, err := lazyInstallProjectTarget(context.Background(), selection); err == nil || !strings.Contains(err.Error(), "not present") {
+		t.Fatalf("missing target error = %v", err)
+	}
+}
+
+func testLazyInstallAmbiguousTarget(t *testing.T) {
+	manifestPath, _ := configureLazyProject(t, []byte("#!/bin/sh\nexit 0\n"))
+	writeCommandManifest(t, manifestPath, state.Manifest{
+		SchemaVersion: manifest.SchemaVersion,
+		Apps: []state.ManifestApp{
+			{Repository: "acme/one", Provider: manifest.ProviderGitHub, Tag: "v1.0.0", Asset: "tool", TargetName: "tool"},
+			{Repository: "acme/two", Provider: manifest.ProviderGitHub, Tag: "v1.0.0", Asset: "tool", TargetName: "tool"},
+		},
+	})
+	selection := TargetSelection{Source: selectionProject, ManifestPath: manifestPath, Target: "tool"}
+	if _, err := lazyInstallProjectTarget(context.Background(), selection); err == nil || !strings.Contains(err.Error(), "matches multiple") {
+		t.Fatalf("ambiguous target error = %v", err)
+	}
 }
 
 func TestLazyInstallRejectsProviderAndReleaseFailures(t *testing.T) {
@@ -403,52 +408,56 @@ func TestLazyInstallHandlesCacheLockAndStagingFailures(t *testing.T) {
 }
 
 func TestLazyInstallHandlesConfigurationAndExtractionFailures(t *testing.T) {
-	t.Run("configuration load", func(t *testing.T) {
-		manifestPath, _ := configureLazyProject(t, []byte("#!/bin/sh\nexit 0\n"))
-		brokenConfigHome := filepath.Join(t.TempDir(), "config-file")
-		if err := os.WriteFile(brokenConfigHome, []byte("not a directory"), 0600); err != nil {
-			t.Fatal(err)
-		}
-		t.Setenv("XDG_CONFIG_HOME", brokenConfigHome)
-		selection := TargetSelection{Source: selectionProject, ManifestPath: manifestPath, Target: "tool"}
-		if _, err := lazyInstallProjectTarget(context.Background(), selection); err == nil || !strings.Contains(err.Error(), "load config for lazy install") {
-			t.Fatalf("configuration failure = %v", err)
-		}
-	})
+	t.Run("configuration load", testLazyInstallConfigurationLoadFailure)
+	t.Run("temporary file", testLazyInstallTemporaryFileFailure)
+	t.Run("empty extracted binary", testLazyInstallEmptyExtractedBinary)
+}
 
-	t.Run("temporary file", func(t *testing.T) {
-		_, client := configureLazyProject(t, []byte("#!/bin/sh\nexit 0\n"))
-		temporaryDirectory := filepath.Join(t.TempDir(), "tmp-file")
-		if err := os.WriteFile(temporaryDirectory, []byte("not a directory"), 0600); err != nil {
-			t.Fatal(err)
-		}
-		t.Setenv("TMPDIR", temporaryDirectory)
-		selection, err := ResolveTarget("tool", TargetResolveOptions{})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := lazyInstallProjectTarget(context.Background(), selection); err == nil || !strings.Contains(err.Error(), "staging file") {
-			t.Fatalf("temporary-file failure = %v", err)
-		}
-		if client.downloads.Load() != 0 {
-			t.Fatalf("temporary-file failure downloaded %d assets", client.downloads.Load())
-		}
-	})
+func testLazyInstallConfigurationLoadFailure(t *testing.T) {
+	manifestPath, _ := configureLazyProject(t, []byte("#!/bin/sh\nexit 0\n"))
+	brokenConfigHome := filepath.Join(t.TempDir(), "config-file")
+	if err := os.WriteFile(brokenConfigHome, []byte("not a directory"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("XDG_CONFIG_HOME", brokenConfigHome)
+	selection := TargetSelection{Source: selectionProject, ManifestPath: manifestPath, Target: "tool"}
+	if _, err := lazyInstallProjectTarget(context.Background(), selection); err == nil || !strings.Contains(err.Error(), "load config for lazy install") {
+		t.Fatalf("configuration failure = %v", err)
+	}
+}
 
-	t.Run("empty extracted binary", func(t *testing.T) {
-		_, client := configureLazyProject(t, nil)
-		selection, err := ResolveTarget("tool", TargetResolveOptions{})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := lazyInstallProjectTarget(context.Background(), selection); err == nil || !strings.Contains(err.Error(), "publish lazy artifact cache") {
-			t.Fatalf("empty-binary failure = %v", err)
-		}
-		if client.downloads.Load() != 1 {
-			t.Fatalf("extraction failure downloads = %d, want one", client.downloads.Load())
-		}
-		assertLazyCacheHasNoPartialPublish(t)
-	})
+func testLazyInstallTemporaryFileFailure(t *testing.T) {
+	_, client := configureLazyProject(t, []byte("#!/bin/sh\nexit 0\n"))
+	temporaryDirectory := filepath.Join(t.TempDir(), "tmp-file")
+	if err := os.WriteFile(temporaryDirectory, []byte("not a directory"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("TMPDIR", temporaryDirectory)
+	selection, err := ResolveTarget("tool", TargetResolveOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := lazyInstallProjectTarget(context.Background(), selection); err == nil || !strings.Contains(err.Error(), "staging file") {
+		t.Fatalf("temporary-file failure = %v", err)
+	}
+	if client.downloads.Load() != 0 {
+		t.Fatalf("temporary-file failure downloaded %d assets", client.downloads.Load())
+	}
+}
+
+func testLazyInstallEmptyExtractedBinary(t *testing.T) {
+	_, client := configureLazyProject(t, nil)
+	selection, err := ResolveTarget("tool", TargetResolveOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := lazyInstallProjectTarget(context.Background(), selection); err == nil || !strings.Contains(err.Error(), "publish lazy artifact cache") {
+		t.Fatalf("empty-binary failure = %v", err)
+	}
+	if client.downloads.Load() != 1 {
+		t.Fatalf("extraction failure downloads = %d, want one", client.downloads.Load())
+	}
+	assertLazyCacheHasNoPartialPublish(t)
 }
 
 func TestLazyInstallUsesChecksumPolicyAfterDownload(t *testing.T) {

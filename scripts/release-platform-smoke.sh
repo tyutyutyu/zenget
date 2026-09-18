@@ -27,6 +27,12 @@ sha256_file() {
   fi
 }
 
+download_https_file() {
+  local url="$1"
+  local output_path="$2"
+  curl --fail --location --retry 3 --proto '=https' --proto-redir '=https' "$url" --output "$output_path"
+}
+
 download_release() {
   local release_tag="$1"
   local output_dir="$2"
@@ -34,11 +40,11 @@ download_release() {
   local archive="zenget_${release_version}_${archive_os}_${archive_arch}.tar.gz"
   local base="https://github.com/${repository}/releases/download/${release_tag}"
   mkdir -p "$output_dir"
-  if ! curl --fail --location --retry 3 --proto '=https' --proto-redir '=https' "$base/checksums.txt" --output "$output_dir/checksums.txt"; then
+  if ! download_https_file "$base/checksums.txt" "$output_dir/checksums.txt"; then
     echo "failed to download public release checksums for $release_tag" >&2
     return 1
   fi
-  if ! curl --fail --location --retry 3 --proto '=https' --proto-redir '=https' "$base/$archive" --output "$output_dir/$archive"; then
+  if ! download_https_file "$base/$archive" "$output_dir/$archive"; then
     echo "failed to download public release archive $archive" >&2
     return 1
   fi
