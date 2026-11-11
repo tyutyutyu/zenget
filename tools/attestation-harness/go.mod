@@ -2,7 +2,7 @@ module zenget-attestation-harness
 
 go 1.26.0
 
-toolchain go1.27.1
+toolchain go1.27.4
 
 require github.com/sigstore/sigstore-go v1.3.0
 
