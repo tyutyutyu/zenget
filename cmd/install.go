@@ -163,33 +163,13 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("read --no-registry flag: %w", err)
 	}
-	var installRecipe *recipe.Recipe
-	var autoRegistryName string
-	var autoRegistrySource registry.Source
-	if registrySet {
-		installRecipe, err = loadRegistryInstallRecipe(registryName, args[0])
-	} else {
-		installRecipe, err = loadInstallRecipe(recipePath, recipeSet)
-		if err == nil && installRecipe == nil && !noRegistry {
-			installRecipe, autoRegistryName, autoRegistrySource, _ = resolveAutomaticRegistryRecipe(args[0])
-		}
-	}
-	if err != nil {
-		return err
-	}
-	if _, err := prepareInstallRecipe(installOptions{
-		goos:          goos,
-		goarch:        goarch,
-		installRecipe: installRecipe,
-	}, args[0]); err != nil {
-		return err
-	}
 
 	client, err := newCommandProvider(cmd)
 	if err != nil {
 		return err
 	}
 	return runInstallWithOptions(cmd.Context(), client, args[0], installOptions{
+		allowRecipeRequest: true,
 		assetOverride:      assetOverride,
 		assetOverrideSet:   flagChanged(cmd, "asset"),
 		assetMatch:         assetMatch,
@@ -198,11 +178,10 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		assetMatchRegexSet: flagChanged(cmd, "asset-match-regex"),
 		checksumPolicy:     checksumPolicy,
 		checksumPolicySet:  checksumPolicySet,
-		installRecipe:      installRecipe,
+		recipePath:         recipePath,
+		recipePathSet:      recipeSet,
 		registryName:       registryName,
 		registryNameSet:    registrySet,
-		registryAutoName:   autoRegistryName,
-		registryAutoSource: autoRegistrySource,
 		offline:            offline,
 		noRegistry:         noRegistry,
 		binName:            binName,
@@ -214,7 +193,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		goarch:             goarch,
 		minAgeDays:         minAgeDays,
 		input:              cmd.InOrStdin(),
-		interactive:        stdinIsTerminal(),
+		interactive:        commandInputIsTerminal(cmd.InOrStdin()),
 	}, cmd.OutOrStdout())
 }
 
@@ -267,11 +246,18 @@ func flagChanged(cmd *cobra.Command, name string) bool {
 }
 
 var stdinIsTerminal = func() bool {
-	if os.Stdin == nil {
+	return fileIsTerminal(os.Stdin)
+}
+
+func commandInputIsTerminal(input io.Reader) bool {
+	file, ok := input.(*os.File)
+	if !ok {
 		return false
 	}
-	info, err := os.Stdin.Stat()
-	return err == nil && info.Mode()&os.ModeCharDevice != 0
+	if file == os.Stdin {
+		return stdinIsTerminal()
+	}
+	return fileIsTerminal(file)
 }
 
 var persistState = func(st *state.State) error {
@@ -336,6 +322,7 @@ func runInstallWithMinAge(ctx context.Context, client provider.Provider, reposit
 }
 
 type installOptions struct {
+	allowRecipeRequest bool
 	assetOverride      string
 	assetOverrideSet   bool
 	assetMatch         string
@@ -371,7 +358,7 @@ type installOptions struct {
 	exactTag           bool
 }
 
-func runInstallWithOptions(ctx context.Context, client provider.Provider, repository string, options installOptions, out io.Writer) error {
+func runInstallWithOptions(ctx context.Context, client provider.Provider, repository string, options installOptions, out io.Writer) (result error) {
 	if !repoPattern.MatchString(repository) {
 		return fmt.Errorf("invalid repository %q: expected org/repo", repository)
 	}
@@ -384,21 +371,40 @@ func runInstallWithOptions(ctx context.Context, client provider.Provider, reposi
 	if options.offline && options.registryName == "" {
 		return fmt.Errorf("--offline requires a named registry snapshot")
 	}
-	if options.registryName != "" && options.recipePathSet {
+	if (options.registryNameSet || options.registryName != "") && (options.recipePathSet || options.recipePath != "") {
 		return fmt.Errorf("--recipe and --registry are mutually exclusive")
 	}
 	checksumPolicy, err := resolveInstallChecksumPolicy(options)
 	if err != nil {
 		return err
 	}
-	if options.registryName != "" && options.installRecipe == nil {
-		options.installRecipe, err = loadRegistryInstallRecipe(options.registryName, repository)
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if out == nil {
+		out = io.Discard
+	}
+	if options.input == nil {
+		options.input = os.Stdin
+	}
+	if options.interactive && options.prompter == nil {
+		options.prompter = wizard.New(options.input, out)
+	}
+	var missing []missingRegistryRecipe
+	knownTag := ""
+	defer func() {
+		if options.installRecipe == nil && len(missing) > 0 {
+			offerRecipeRequest(ctx, client, repository, options, missing, knownTag, result, out)
+		}
+	}()
+	if (options.registryNameSet || options.registryName != "") && options.installRecipe == nil {
+		options.installRecipe, missing, err = resolveNamedRegistryRecipe(options.registryName, repository)
 		if err != nil {
 			return err
 		}
 	}
 	if options.installRecipe == nil && options.registryName == "" && !options.recipePathSet && options.recipePath == "" && !options.noRegistry {
-		options.installRecipe, options.registryAutoName, options.registryAutoSource, _ = resolveAutomaticRegistryRecipe(repository)
+		options.installRecipe, options.registryAutoName, options.registryAutoSource, _, missing = resolveAutomaticRegistryRecipeWithMissing(repository)
 	}
 	installRecipe, err := prepareInstallRecipe(options, repository)
 	if err != nil {
@@ -415,22 +421,10 @@ func runInstallWithOptions(ctx context.Context, client provider.Provider, reposi
 	if client == nil {
 		return fmt.Errorf("GitHub client is nil")
 	}
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	if out == nil {
-		out = io.Discard
-	}
 	if installRecipe != nil && options.registryAutoName != "" {
 		if _, err := fmt.Fprintf(out, "Using recipe for %s from registry %s (%s)\n", repository, options.registryAutoName, options.registryAutoSource.String()); err != nil {
 			return err
 		}
-	}
-	if options.input == nil {
-		options.input = os.Stdin
-	}
-	if options.interactive && options.prompter == nil {
-		options.prompter = wizard.New(options.input, out)
 	}
 	if options.assetVerified && options.assetPath == "" {
 		return fmt.Errorf("verified release asset path is missing")
@@ -465,6 +459,7 @@ func runInstallWithOptions(ctx context.Context, client provider.Provider, reposi
 		return releaseResolutionError(repository, options, fmt.Errorf("provider returned no release tag"))
 	}
 
+	knownTag = rel.TagName
 	if previouslyInstalled && previous.Version == rel.TagName {
 		if !options.force {
 			if options.releaseFilterSet && previous.ReleaseFilter != options.releaseFilter {
