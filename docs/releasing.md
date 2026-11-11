@@ -2,8 +2,10 @@
 
 The release process is deliberately split into a reviewed source change, an
 immutable signed tag, a verified draft, and a separate maintainer publication.
-The root module supports Go 1.26.0 and newer. CI tests Go 1.26.8 and 1.27.1;
-release builds use Go 1.26.8 with `GOTOOLCHAIN=local`.
+The root module supports Go 1.26.0 and newer. The CI quality matrix tests
+Go 1.26.8 and 1.27.1; lint, vulnerability scans, Windows tests, CodeQL and
+release builds use Go 1.27.4 with `GOTOOLCHAIN=local`, so the scanned and
+shipped standard library includes the latest security fixes.
 
 ## Prepare and tag a release
 
