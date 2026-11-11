@@ -110,7 +110,8 @@ scripts/verify-release-artifacts.sh dist --run-help
 
 Enable repository-owned, active protections before the first stable release:
 
-- `main`: pull request review, stale-review dismissal, conversation
+- `main`: pull requests (no approving review is required while the project
+  has a single maintainer), stale-review dismissal, conversation
   resolution, no force-push or deletion, and required checks named
   `Go quality / 1.26.8`, `Go quality / 1.27.1`, `Focused static lint`,
   `Go vulnerability scan`, `Windows ownership tests`,
