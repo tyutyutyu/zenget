@@ -2,8 +2,10 @@
 
 The release process is deliberately split into a reviewed source change, an
 immutable signed tag, a verified draft, and a separate maintainer publication.
-The root module supports Go 1.26.0 and newer. CI tests Go 1.26.8 and 1.27.1;
-release builds use Go 1.26.8 with `GOTOOLCHAIN=local`.
+The root module supports Go 1.26.0 and newer. The CI quality matrix tests
+Go 1.26.8 and 1.27.1; lint, vulnerability scans, Windows tests, CodeQL and
+release builds use Go 1.27.4 with `GOTOOLCHAIN=local`, so the scanned and
+shipped standard library includes the latest security fixes.
 
 ## Prepare and tag a release
 
@@ -108,7 +110,8 @@ scripts/verify-release-artifacts.sh dist --run-help
 
 Enable repository-owned, active protections before the first stable release:
 
-- `main`: pull request review, stale-review dismissal, conversation
+- `main`: pull requests (no approving review is required while the project
+  has a single maintainer), stale-review dismissal, conversation
   resolution, no force-push or deletion, and required checks named
   `Go quality / 1.26.8`, `Go quality / 1.27.1`, `Focused static lint`,
   `Go vulnerability scan`, `Windows ownership tests`,
