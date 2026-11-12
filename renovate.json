@@ -1,6 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
+    "local>tyutyutyu/github-manager//renovate/default",
     "config:best-practices"
   ],
   "timezone": "Europe/Budapest",
