@@ -2,6 +2,7 @@ package wizard
 
 import (
 	"bytes"
+	"io"
 	"strings"
 	"testing"
 )
@@ -58,5 +59,18 @@ func TestInteractive(t *testing.T) {
 	}
 	if choice != "one" || name != "repo" {
 		t.Fatalf("Interactive() = (%q, %q), want (one, repo)", choice, name)
+	}
+}
+
+func TestConfirmRequiresCompleteConsent(t *testing.T) {
+	for _, tc := range []struct {
+		input string
+		yes   bool
+	}{{"yes\n", true}, {"Y\n", true}, {"\n", false}, {"n\n", false}, {"", false}, {"yes", false}} {
+		session := New(strings.NewReader(tc.input), io.Discard)
+		yes, err := session.Confirm("Submit?")
+		if err != nil || yes != tc.yes {
+			t.Fatalf("%q: %v %v", tc.input, yes, err)
+		}
 	}
 }
