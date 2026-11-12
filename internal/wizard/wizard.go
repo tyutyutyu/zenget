@@ -11,8 +11,9 @@ import (
 
 // Session keeps one buffered input reader for a sequence of prompts.
 type Session struct {
-	reader *bufio.Reader
-	out    io.Writer
+	reader  *bufio.Reader
+	out     io.Writer
+	aborted bool
 }
 
 // New creates a prompt session using in and out.
@@ -45,11 +46,15 @@ func (s *Session) Choose(prompt string, options []string) (string, error) {
 	}
 
 	line, err := s.reader.ReadString('\n')
+	if err != nil {
+		s.aborted = true
+	}
 	if err != nil && err != io.EOF {
 		return "", fmt.Errorf("read choice: %w", err)
 	}
 	choice, err := strconv.Atoi(strings.TrimSpace(line))
 	if err != nil || choice < 1 || choice > len(options) {
+		s.aborted = true
 		return "", fmt.Errorf("invalid choice %q: enter a number from 1 to %d", strings.TrimSpace(line), len(options))
 	}
 	return options[choice-1], nil
@@ -64,6 +69,9 @@ func (s *Session) Ask(prompt, defaultValue string) (string, error) {
 		return "", err
 	}
 	line, err := s.reader.ReadString('\n')
+	if err != nil {
+		s.aborted = true
+	}
 	if err != nil && err != io.EOF {
 		return "", fmt.Errorf("read answer: %w", err)
 	}
@@ -100,4 +108,28 @@ func Interactive(in io.Reader, out io.Writer, prompt string, options []string, d
 		return "", "", err
 	}
 	return choice, targetName, nil
+}
+
+// Aborted reports whether an earlier prompt ended with EOF or invalid input.
+func (s *Session) Aborted() bool { return s.aborted }
+
+// Confirm requires a complete explicit yes line. EOF, empty input and any
+// other answer decline; an interrupted session never starts another prompt.
+func (s *Session) Confirm(prompt string) (bool, error) {
+	if s.aborted {
+		return false, nil
+	}
+	if _, err := fmt.Fprintf(s.out, "%s [y/N]: ", prompt); err != nil {
+		return false, err
+	}
+	line, err := s.reader.ReadString('\n')
+	if err != nil {
+		s.aborted = true
+		if err == io.EOF {
+			return false, nil
+		}
+		return false, err
+	}
+	answer := strings.ToLower(strings.TrimSpace(line))
+	return answer == "y" || answer == "yes", nil
 }

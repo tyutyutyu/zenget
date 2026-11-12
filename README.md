@@ -298,8 +298,60 @@ no failure mode in which automatic resolution blocks a non-registry install.
 `install --no-registry` disables only this automatic lookup; explicit
 `--registry` and `--recipe` are unaffected. Automatic resolution reads only
 the local snapshot cache, so it adds no network requests; `zenget registry
-sync` remains the only network step, and `--offline` keeps its existing
+sync` fetches recipe snapshots, and `--offline` keeps its existing
 meaning of requiring `--registry`.
+
+#### Requesting a missing recipe
+
+For a GitHub.com upstream, an interactive `install` can offer to submit a
+recipe request **after** the installation attempt, whether it succeeded or
+failed. At least one synchronized, policy-authorized, valid snapshot must
+confirm that the recipe is absent, and no snapshot recipe may have been used.
+Missing configuration, unsynchronized or corrupt caches, and denied sources
+alone never trigger the offer. An explicit `--registry NAME` miss can also
+trigger it, while preserving the original error and skipping heuristic fallback.
+
+The issue target is the GitHub repository in the configured registry source;
+there is no assumed central registry endpoint. If several snapshots confirm a
+miss, choose one by its registry name and target repository. zenget shows the
+target, title (`Recipe request: owner/repo`), and complete English body before
+asking `Submit this recipe request to GitHub? [y/N]`. Only a complete `y` or
+`yes` answer starts request-related network checks. Enter, rejection, EOF, or
+an interrupted install submits nothing. Each run can create at most one issue.
+
+The body includes a normalized project marker, upstream GitHub URL, actual
+target OS/architecture (including `--system`), zenget version, known release tag
+or `unknown`, registry name/root, pinned snapshot commit, and installation
+outcome. It excludes raw errors, logs, local paths, environment variables, and
+credentials. The original installation result and exit status remain unchanged
+if the request fails or is declined.
+
+Request submission uses the GitHub.com API directly, with `ZENGET_GITHUB_TOKEN`
+first and `GITHUB_TOKEN` as fallback; it does not require `gh`. A fine-grained
+token needs **Issues: write** on the chosen registry repository and read access
+for its contents and issue search. The installed tool's forge, `--api-base-url`,
+and GitLab/Forgejo credentials never configure this client. Without a token, or
+when API checks or creation cannot be confirmed, zenget prints the manual URL
+`https://github.com/OWNER/REGISTRY/issues/new`. It never opens a browser or
+blindly retries an uncertain POST; check existing issues before submitting by hand.
+
+After approval, zenget strictly validates the selected root's `registry.json`
+on the registry's current default branch. If a recipe is already there, no
+issue is created: update the configured commit pin (`registry remove NAME`,
+then `registry add NAME github:OWNER/REGISTRY@NEW_COMMIT:ROOT`) and run
+`zenget registry sync NAME`. The check does not change the pin, policy, snapshot,
+or installation source. Uncertain index checks stop submission. Otherwise,
+zenget checks open issues for the exact upstream project marker or exact recipe
+request title, excluding similar project names and pull requests. An existing
+request's URL is shown without posting a new issue or comment. Incomplete
+searches stop submission. This reduces duplicates on the client; simultaneous
+requests from different users can still race.
+
+There is no offer or request-related network activity in CI, with
+noninteractive input, with `--offline`, with an explicit local `--recipe`, or
+when automatic lookup is disabled by `--no-registry`. The latter still permits
+an explicit `--registry` offer. Apply, upgrade, ensure, and lazy installation do
+not offer requests. This feature does not publish or enable the pilot registry.
 
 Enabling a registry is a deliberate three-step trust decision: allow the
 source in the remote recipe policy, add the named source, and synchronize a
