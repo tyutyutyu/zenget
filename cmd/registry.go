@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -255,41 +256,55 @@ func syncOneRegistry(ctx context.Context, client registryContentsClient, configu
 	return nil
 }
 
+type missingRegistryRecipe struct {
+	name   string
+	source registry.Source
+}
+
 func loadRegistryInstallRecipe(name, repository string) (*recipe.Recipe, error) {
+	loaded, _, err := resolveNamedRegistryRecipe(name, repository)
+	return loaded, err
+}
+
+func resolveNamedRegistryRecipe(name, repository string) (*recipe.Recipe, []missingRegistryRecipe, error) {
 	if strings.TrimSpace(name) == "" {
-		return nil, fmt.Errorf("--registry must name a configured registry")
+		return nil, nil, fmt.Errorf("--registry must name a configured registry")
 	}
 	config, err := registry.LoadConfig()
 	if err != nil {
-		return nil, fmt.Errorf("load registry config: %w", err)
+		return nil, nil, fmt.Errorf("load registry config: %w", err)
 	}
 	configured, found, err := config.Find(name)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if !found {
-		return nil, fmt.Errorf("unknown registry %q", name)
+		return nil, nil, fmt.Errorf("unknown registry %q", name)
 	}
 	source, err := registry.ParseSource(configured.Source)
 	if err != nil {
-		return nil, fmt.Errorf("registry %s source: %w", name, err)
+		return nil, nil, fmt.Errorf("registry %s source: %w", name, err)
 	}
 	cache, err := registry.NewCache()
 	if err != nil {
-		return nil, fmt.Errorf("open registry cache: %w", err)
+		return nil, nil, fmt.Errorf("open registry cache: %w", err)
 	}
 	entry, data, err := cache.Lookup(source, repository)
 	if err != nil {
-		return nil, fmt.Errorf("load registry %s snapshot: %w", name, err)
+		var missing []missingRegistryRecipe
+		if errors.Is(err, registry.ErrRecipeNotFound) {
+			missing = []missingRegistryRecipe{{name: name, source: source}}
+		}
+		return nil, missing, fmt.Errorf("load registry %s snapshot: %w", name, err)
 	}
 	loaded, err := recipe.Decode(data, "registry recipe")
 	if err != nil {
-		return nil, fmt.Errorf("validate registry recipe %q: %w", entry.Repository, err)
+		return nil, nil, fmt.Errorf("validate registry recipe %q: %w", entry.Repository, err)
 	}
 	if loaded.Repository != repository {
-		return nil, fmt.Errorf("registry recipe repository %q does not match command repository %q", loaded.Repository, repository)
+		return nil, nil, fmt.Errorf("registry recipe repository %q does not match command repository %q", loaded.Repository, repository)
 	}
-	return &loaded, nil
+	return &loaded, nil, nil
 }
 
 // resolveAutomaticRegistryRecipe consults every configured registry snapshot in
@@ -302,18 +317,24 @@ func loadRegistryInstallRecipe(name, repository string) (*recipe.Recipe, error) 
 // back to heuristic install behavior. A nil recipe with no reasons means no
 // registry is configured at all.
 func resolveAutomaticRegistryRecipe(repository string) (*recipe.Recipe, string, registry.Source, []string) {
+	loaded, name, source, reasons, _ := resolveAutomaticRegistryRecipeWithMissing(repository)
+	return loaded, name, source, reasons
+}
+
+func resolveAutomaticRegistryRecipeWithMissing(repository string) (*recipe.Recipe, string, registry.Source, []string, []missingRegistryRecipe) {
 	config, err := registry.LoadConfig()
 	if err != nil {
-		return nil, "", registry.Source{}, []string{fmt.Sprintf("registry config unavailable: %v", err)}
+		return nil, "", registry.Source{}, []string{fmt.Sprintf("registry config unavailable: %v", err)}, nil
 	}
 	if len(config.Registries) == 0 {
-		return nil, "", registry.Source{}, nil
+		return nil, "", registry.Source{}, nil, nil
 	}
 	cache, err := registry.NewCache()
 	if err != nil {
-		return nil, "", registry.Source{}, []string{fmt.Sprintf("registry cache unavailable: %v", err)}
+		return nil, "", registry.Source{}, []string{fmt.Sprintf("registry cache unavailable: %v", err)}, nil
 	}
 	var reasons []string
+	var missing []missingRegistryRecipe
 	for _, configured := range config.Registries {
 		source, err := registry.ParseSource(configured.Source)
 		if err != nil {
@@ -322,6 +343,9 @@ func resolveAutomaticRegistryRecipe(repository string) (*recipe.Recipe, string, 
 		}
 		_, data, err := cache.Lookup(source, repository)
 		if err != nil {
+			if errors.Is(err, registry.ErrRecipeNotFound) {
+				missing = append(missing, missingRegistryRecipe{name: configured.Name, source: source})
+			}
 			reasons = append(reasons, fmt.Sprintf("registry %s: %v", configured.Name, err))
 			continue
 		}
@@ -334,9 +358,9 @@ func resolveAutomaticRegistryRecipe(repository string) (*recipe.Recipe, string, 
 			reasons = append(reasons, fmt.Sprintf("registry %s: recipe repository %q does not match %q", configured.Name, decoded.Repository, repository))
 			continue
 		}
-		return &decoded, configured.Name, source, reasons
+		return &decoded, configured.Name, source, reasons, nil
 	}
-	return nil, "", registry.Source{}, reasons
+	return nil, "", registry.Source{}, reasons, missing
 }
 
 func checkRegistryPolicy(source registry.Source, relativePath string) error {
