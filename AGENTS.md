@@ -1,10 +1,8 @@
 # zenget public Go repository
 
-`zenget` is a Cobra-based Go CLI that installs GitHub release binaries and supports local registry, manifests, recipe resolution, and integrity checks. This repository contains public code and documentation; planning data lives in the sibling `../zenget-backlog/.backlog/` repository.
+`zenget` is a Cobra-based Go CLI that installs GitHub release binaries and supports local registry, manifests, recipe resolution, and integrity checks. This repository contains public code and documentation.
 
 ## Working here
-
-When working in `zenget-workspace`, run `backlog instructions overview` from `../zenget-backlog/` for every request, then follow the matching Backlog task guide when the request involves task lifecycle work. Use the Backlog CLI to change task metadata and content. A standalone clone can be built and tested without the sibling planning repository. Keep `.backlog/` out of this public repository.
 
 Use Go modules. Source is in `main.go`, `cmd/`, and `internal/`; tests are adjacent `*_test.go` files. `docs/`, `schemas/`, `renovate/`, `scripts/`, and `tools/attestation-harness/` provide documentation, schemas, automation, and an offline attestation spike. User-facing behavior is documented in `README.md`.
 
