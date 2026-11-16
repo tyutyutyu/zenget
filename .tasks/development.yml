@@ -1,0 +1,63 @@
+---
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: "3"
+
+# Mirrors the checks of .github/workflows/ci.yml (job "test").
+tasks:
+  fmt-check:
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        formatted="$(git ls-files -z -- '*.go' | xargs -0 -r gofmt -l)"
+        if [ -n "$formatted" ]; then
+          printf 'The following Go files are not gofmt-clean:\n%s\n' "$formatted"
+          exit 1
+        fi
+
+  mod-check:
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - go mod verify
+      - |
+        tidy_diff="$(go mod tidy -diff)"
+        if [ -n "$tidy_diff" ]; then
+          printf 'go mod tidy -diff reported changes:\n%s\n' "$tidy_diff"
+          exit 1
+        fi
+
+  vet:
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - go vet ./...
+
+  test:
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - go test ./...
+
+  coverage:
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - scripts/check-coverage.sh
+
+  test-race:
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - go test -race ./...
+
+  build:
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - go build ./...
+
+  verify:
+    preconditions:
+      - sh: command -v go
+        msg: go is not on PATH
+    cmds:
+      - task: fmt-check
+      - task: mod-check
+      - task: vet
+      - task: coverage
+      - task: test-race
+      - task: build
