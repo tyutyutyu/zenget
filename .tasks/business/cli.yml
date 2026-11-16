@@ -1,0 +1,13 @@
+---
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: "3"
+
+tasks:
+  build:
+    desc: Build the zenget binary into ./zenget
+    dir: "{{.ROOT_DIR}}"
+    preconditions:
+      - sh: command -v go
+        msg: go is not on PATH
+    cmds:
+      - go build -o zenget .
